@@ -18,6 +18,15 @@ import * as schema from "@/db/schema";
 // 初始化并导出认证系统实例
 // 这个实例将被用于处理所有的认证相关操作
 export const auth = betterAuth({
+  // 配置社交登录提供商
+  socialProviders: {
+    github: {
+      // GitHub 客户端 ID
+      clientId: process.env.GITHUB_CLIENT_ID as string,
+      // GitHub 客户端密钥
+      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+    },
+  },
   // 配置邮箱和密码认证方式
   // 这是最基本的认证方式，允许用户使用邮箱和密码进行注册和登录
   emailAndPassword: {
