@@ -1,5 +1,6 @@
 // 导入侧边栏相关组件: SidebarProvider 用于提供侧边栏上下文, SidebarTrigger 用于触发侧边栏的显示/隐藏
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { DashboardNavbar } from "@/modules/dashboard/ui/components/dashboard-navbar";
 // 导入仪表盘专用的侧边栏组件
 import { DashboardSidebar } from "@/modules/dashboard/ui/components/dashboard-sidebar";
 
@@ -18,8 +19,7 @@ const Layout = ({ children }: Props) => {
       <DashboardSidebar />
       {/* 主要内容区域: 使用 flex 布局, 占满整个视口高度和宽度, 背景色为 muted */}
       <main className="flex flex-col h-screen w-screen bg-muted">
-        {/* 侧边栏触发器, 用于在移动端显示/隐藏侧边栏 */}
-        <SidebarTrigger />
+        <DashboardNavbar />
         {/* 渲染传入的子组件内容 */}
         {children}
       </main>
