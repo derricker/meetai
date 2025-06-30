@@ -107,6 +107,38 @@ export const SignUpView = () => {
     );
   };
 
+  // 处理社交登录
+  const onSocial = (provider: "github" | "google") => {
+    // 清除之前的错误信息
+    setError(null);
+    // 设置提交状态为进行中
+    setPending(true);
+
+    // 调用认证客户端的社交登录方法
+    authClient.signIn.social(
+      {
+        // 社交提供商 (github或google)
+        provider: provider,
+        // 登录成功后的回调URL
+        callbackURL: "/",
+      },
+      {
+        // 登录成功回调
+        onSuccess: () => {
+          // 登录成功, 设置提交状态为非进行中
+          setPending(false);
+        },
+        // 登录失败回调
+        onError: ({ error }) => {
+          // 登录失败, 设置提交状态为非进行中
+          setPending(false);
+          // 设置错误信息
+          setError(error.message);
+        },
+      }
+    );
+  };
+
   // 渲染组件 UI
   return (
     <div className="flex flex-col gap-6">
@@ -227,6 +259,7 @@ export const SignUpView = () => {
                     variant="outline"
                     type="button"
                     className="w-full"
+                    onClick={() => onSocial("google")}
                   >
                     <FaGoogle />
                   </Button>
@@ -235,6 +268,7 @@ export const SignUpView = () => {
                     variant="outline"
                     type="button"
                     className="w-full"
+                    onClick={() => onSocial("github")}
                   >
                     <FaGithub />
                   </Button>

@@ -26,6 +26,12 @@ export const auth = betterAuth({
       // GitHub 客户端密钥
       clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
     },
+    google: {
+      // Google OAuth 客户端ID
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      // Google OAuth 客户端密钥
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
   },
   // 配置邮箱和密码认证方式
   // 这是最基本的认证方式，允许用户使用邮箱和密码进行注册和登录
