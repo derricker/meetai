@@ -2,6 +2,7 @@
 import { auth } from "@/lib/auth";
 // 导入主页视图组件
 import { HomeView } from "@/modules/home/ui/views/home-view";
+import { caller } from "@/trpc/server";
 // 导入用于获取请求头的Next.js工具
 import { headers } from "next/headers";
 // 导入用于页面重定向的Next.js工具
@@ -16,6 +17,14 @@ export const Page = async () => {
 
   // 如果没有有效会话，重定向到登录页面
   if (!session) return redirect("/sign-in");
+
+  const data = await caller.hello({ text: "server" });
+
+  return (
+    <div className="flex flex-col p-4 gap-y-4">
+      <p>{data.greeting}</p>
+    </div>
+  );
 
   // 如果用户已登录，渲染主页视图组件
   return <HomeView />;
