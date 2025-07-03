@@ -3,12 +3,12 @@ import { Dispatch, SetStateAction, useState } from "react";
 
 // 导入命令面板相关组件
 import {
-  CommandDialog, // 命令对话框容器
   CommandInput, // 命令输入框
   CommandItem, // 命令项
   CommandList, // 命令列表
   CommandGroup, // 命令分组
-  CommandEmpty, // 空状态显示
+  CommandEmpty,
+  CommandResponsiveDialog, // 空状态显示
 } from "@/components/ui/command";
 // 导入头像生成组件
 import { GeneratedAvatar } from "@/components/generated-avatar";
@@ -27,7 +27,7 @@ export const DashboardCommand = ({ open, setOpen }: Props) => {
   const [search, setSearch] = useState("");
   return (
     // 命令对话框，根据open状态显示或隐藏
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandResponsiveDialog open={open} onOpenChange={setOpen}>
       {/* 搜索输入框 */}
       <CommandInput
         placeholder="查找会议或者智能体" // 占位文本
@@ -66,6 +66,6 @@ export const DashboardCommand = ({ open, setOpen }: Props) => {
           </CommandItem>
         </CommandGroup>
       </CommandList>
-    </CommandDialog>
+    </CommandResponsiveDialog>
   );
 };
