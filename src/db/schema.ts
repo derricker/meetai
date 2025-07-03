@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { nanoid } from "nanoid";
 
 // 用户表定义
 export const user = pgTable("user", {
@@ -92,4 +93,40 @@ export const verification = pgTable("verification", {
   createdAt: timestamp("created_at").$defaultFn(() => new Date()),
   // 记录更新时间，默认为当前时间
   updatedAt: timestamp("updated_at").$defaultFn(() => new Date()),
+});
+
+// 使用 Drizzle ORM 的 pgTable 函数定义一个名为 agents 的 PostgreSQL 数据表
+export const agents = pgTable("agents", {
+  // 定义一个名为 "id" 的 text 类型字段
+  id: text("id")
+    // 将此字段设置为主键
+    .primaryKey()
+    // 设置默认值生成函数, 在插入新记录时调用 nanoid() 生成一个唯一的字符串ID
+    .$defaultFn(() => nanoid()),
+
+  // 定义一个名为 name 的 text 类型字段, 用于存储 agent 的名称
+  name: text("name").notNull(), // notNull() 约束确保此字段不能为空
+
+  // 定义一个名为 user_id 的 text 类型字段, 用于关联用户
+  userId: text("user_id")
+    .notNull() // 确保每个 agent 都关联一个用户
+    // 设置外键约束, 引用自 user 表的 id 字段
+    // { onDelete: "cascade" } 表示当关联的 user 被删除时, 这条 agent 记录也会被级联删除
+    .references(() => user.id, { onDelete: "cascade" }),
+
+  // 定义一个名为 instructions 的 text 类型字段, 用于存储给 agent 的指令或提示
+  instructions: text("instructions").notNull(),
+
+  // 定义一个名为 created_at 的 timestamp 类型字段, 记录创建时间
+  createdAt: timestamp("created_at")
+    .notNull()
+    // 设置默认值为当前时间戳, 在记录创建时自动填充
+    .defaultNow(),
+
+  // 定义一个名为 updated_at 的 timestamp 类型字段, 记录最后更新时间
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    // 设置默认值为当前时间戳, 注意: 这只在创建时生效。
+    // 如果需要在每次更新时自动更新此字段, 通常需要使用数据库触发器或在应用层代码中实现
+    .defaultNow(),
 });
