@@ -3,7 +3,7 @@
 "use client";
 
 // 从 lucide-react 库导入 PlusIcon 组件，用于显示一个加号图标。
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, XCircleIcon } from "lucide-react";
 // 从自定义的 UI 组件库中导入 Button 组件。
 import { Button } from "@/components/ui/button";
 // 从当前目录下的 new-agent-dialog 文件导入 NewAgentDialog 组件。
@@ -11,15 +11,34 @@ import { NewAgentDialog } from "./new-agent-dialog";
 // 从 React 导入 useState hook，用于在函数组件中添加和管理状态。
 import { useState } from "react";
 
+// 导入智能体过滤器钩子，用于管理列表筛选状态
+import { useAgentsFilters } from "../../hooks/use-agents-filters";
+// 导入默认页码常量
+import { DEFAULT_PAGE } from "@/constants";
+// 导入智能体搜索过滤器组件
+import { AgentsSearchFilter } from "./agents-search-filter";
 /**
  * AgentsListHeader 组件
  * 这个组件负责渲染智能体列表页面的头部区域
  * 包括标题和一个用于打开"创建新智能体"对话框的按钮
  */
 export const AgentsListHeader = () => {
+  // 获取过滤条件状态和修改状态的方法
+  const [filters, setFilters] = useAgentsFilters();
   // 使用 useState 创建一个状态变量 isDialogOpen 来控制对话框的打开和关闭
   // setIsDialogOpen 是更新这个状态的函数, 初始值为 false (关闭)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // 检查是否有任何过滤条件被修改 (当前仅检查搜索条件是否存在)
+  const isAnyFilterModified = !!filters.search;
+
+  // 清除所有过滤条件的处理函数
+  const onClearFilters = () => {
+    setFilters({
+      search: "", // 清空搜索内容
+      page: DEFAULT_PAGE, // 重置页码到默认值
+    });
+  };
 
   return (
     <>
@@ -41,6 +60,18 @@ export const AgentsListHeader = () => {
             <PlusIcon /> {/* 按钮内的加号图标 */}
             创建新智能体
           </Button>
+        </div>
+        {/* 搜索过滤器区域，使用flex布局并设置间距 */}
+        <div className="flex items-center gap-x-2 p-1">
+          {/* 渲染智能体搜索过滤器组件 */}
+          <AgentsSearchFilter />
+          {/* 当有过滤条件被修改时，显示清除按钮 */}
+          {isAnyFilterModified && (
+            <Button variant="outline" size="sm" onClick={onClearFilters}>
+              <XCircleIcon /> {/* 显示X形圆圈图标 */}
+              清除
+            </Button>
+          )}
         </div>
       </div>
     </>

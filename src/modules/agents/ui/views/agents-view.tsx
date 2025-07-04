@@ -18,9 +18,17 @@ import { DataTable } from "../components/data-table";
 import { columns } from "../components/columns";
 // 导入空状态组件, 当没有智能体数据时显示引导用户创建的界面
 import { EmptyState } from "@/components/empty-state";
+// 导入智能体过滤器钩子, 用于获取当前的过滤条件状态
+import { useAgentsFilters } from "../../hooks/use-agents-filters";
+// 导入分页组件
+import { DataPagination } from "../components/data-pagination";
 
 // 定义并导出 AgentsView 组件。这是显示智能体列表的核心界面。
 export const AgentsView = () => {
+  // 使用智能体过滤器钩子获取当前的过滤条件
+  // 这里只解构出 filters, 不需要 setFilters 函数, 因为这个组件只读取过滤条件
+  const [filters, setFilters] = useAgentsFilters();
+
   // 调用 useTRPC 钩子, 获取一个 tRPC 客户端实例, 该实例已经配置好了与后端通信所需的一切。
   const trpc = useTRPC();
 
@@ -30,7 +38,11 @@ export const AgentsView = () => {
   // 2. 如果查询出错, 它会抛出一个错误, 这个错误可以被最近的 <ErrorBoundary> 组件捕获。
   // 3. 成功后，它返回的 `data` 字段是确切有值的, 因此我们无需检查其是否存在。
   // `trpc.agents.getMany.queryOptions()` 创建了一个可重用的查询配置对象, 包含了查询键和查询函数。
-  const { data } = useSuspenseQuery(trpc.agents.getMany.queryOptions());
+  const { data } = useSuspenseQuery(
+    trpc.agents.getMany.queryOptions({
+      ...filters,
+    })
+  );
   // 返回视图
   return (
     // 主容器: 使用 Flexbox 布局, 占满剩余空间, 设置内边距和垂直间距
@@ -43,10 +55,16 @@ export const AgentsView = () => {
       {/* 数据表格组件：显示智能体列表 */}
       {/* data: 传入从后端获取的智能体数据数组 */}
       {/* columns: 传入表格列定义，决定表格的结构和渲染方式 */}
-      <DataTable data={data} columns={columns} />
+      <DataTable data={data.items} columns={columns} />
+      {/* 渲染分页组件 */}
+      <DataPagination
+        page={filters.page}
+        totalPages={data.totalPages}
+        onPageChange={(page) => setFilters({ page })}
+      />
       {/* 条件渲染：当智能体数据为空时显示空状态组件 */}
       {/* 使用逻辑与运算符 && 进行条件渲染，只有当 data.length === 0 为真时才渲染 EmptyState */}
-      {data.length === 0 && (
+      {data.items.length === 0 && (
         <EmptyState
           // 空状态标
           title="创建你的第一个智能体"

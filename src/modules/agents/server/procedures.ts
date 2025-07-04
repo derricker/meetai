@@ -13,29 +13,80 @@ import { agentsInsertSchema } from "../schemas";
 // 导入 Zod 库, 用于定义和验证数据结构。
 import { z } from "zod";
 // eq 函数用于在数据库查询中构建等于条件
-import { eq } from "drizzle-orm";
+import { and, count, desc, eq, ilike } from "drizzle-orm";
+
+import {
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+} from "@/constants";
 
 // 创建并导出 agents 相关的 tRPC 路由
 export const agentsRouter = createTRPCRouter({
   /**
    * getMany 查询过程 (Query Procedure)
-   * 用于获取当前用户的所有代理
-   * 这是一个受保护的过程, 意味着只有登录用户才能调用
+   * 用于分页获取当前用户的所有智能体列表，支持按名称搜索
+   *
+   * @param {object} input - 输入参数对象
+   * @param {number} input.page - 当前页码, 默认为 DEFAULT_PAGE
+   * @param {number} input.pageSize - 每页数量, 受 MIN_PAGE_SIZE 和 MAX_PAGE_SIZE 限制
+   * @param {string|null} input.search - 可选的搜索关键词, 用于按名称过滤
+   * @returns {Promise<{items: Agent[], total: number, totalPages: number}>} 返回分页后的数据列表和分页信息
    */
-  getMany: protectedProcedure.query(async () => {
-    // 使用 Drizzle ORM 从 agents 数据库表中查询所有记录。
-    const data = await db.select().from(agents);
+  getMany: protectedProcedure
+    // 定义输入参数的验证规则
+    .input(
+      z.object({
+        // 页码参数, 默认为 DEFAULT_PAGE
+        page: z.number().default(DEFAULT_PAGE),
+        // 每页数量参数, 设置最小和最大限制, 默认为 DEFAULT_PAGE_SIZE
+        pageSize: z
+          .number()
+          .min(MIN_PAGE_SIZE)
+          .max(MAX_PAGE_SIZE)
+          .default(DEFAULT_PAGE_SIZE),
+        // 搜索关键词参数, 可以为空
+        search: z.string().nullish(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { page, pageSize, search } = input;
 
-    // --- 以下是用于开发和调试的示例代码, 默认被注释
-    // 模拟网络延迟, 方便在前端测试加载状态。
-    // await new Promise((resolve) => setTimeout(resolve, 1000));
-    // 模拟一个客户端错误, 方便在前端测试错误处理逻辑
-    // throw new TRPCError({ code: "BAD_REQUEST" });
-    // --- 调试代码结束 ---
+      // 构建基础查询条件: 必须匹配当前用户ID
+      // 如果有搜索关键词, 添加模糊匹配条件
+      const whereCondition = and(
+        eq(agents.userId, ctx.auth.user.id),
+        search ? ilike(agents.name, `%${search}%`) : undefined
+      );
 
-    // 返回查询到的代理数据数组
-    return data;
-  }),
+      // 查询分页数据
+      const data = await db
+        .select()
+        .from(agents)
+        .where(whereCondition)
+        // 按创建时间和ID降序排序
+        .orderBy(desc(agents.createdAt), desc(agents.id))
+        // 应用分页限制
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+
+      // 查询总记录数
+      const [total] = await db
+        .select({ count: count() })
+        .from(agents)
+        .where(whereCondition);
+
+      // 计算总页数
+      const totalPages = Math.ceil(total.count / pageSize);
+
+      // 返回分页数据和分页信息
+      return {
+        items: data, // 当前页的数据列表
+        total: total.count, // 总记录数
+        totalPages, // 总页数
+      };
+    }),
 
   /**
    * getOne 查询过程 (Query Procedure)

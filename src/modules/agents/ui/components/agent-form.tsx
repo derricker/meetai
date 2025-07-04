@@ -62,7 +62,9 @@ export const AgentForm = ({
       // 当 mutation 成功时执行
       onSuccess: async () => {
         // 使 getMany 查询失效, 这将触发 React Query 重新获取 agent 列表, 从而更新 UI
-        await queryClient.invalidateQueries(trpc.agents.getMany.queryOptions());
+        await queryClient.invalidateQueries(
+          trpc.agents.getMany.queryOptions({})
+        );
         // 调用父组件传入的 onSuccess 回调, 例如关闭对话框。
         onSuccess?.();
       },
