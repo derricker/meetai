@@ -12,6 +12,13 @@ import { useTRPC } from "@/trpc/client";
 // 这是 useQuery 的一个变体，它专门设计用来与 React Suspense 和 ErrorBoundary 集成。
 import { useSuspenseQuery } from "@tanstack/react-query";
 
+// 导入数据表格组件, 用于显示智能体列表的表格界面
+import { DataTable } from "../components/data-table";
+// 导入表格列定义, 定义了智能体表格的列结构和渲染方式
+import { columns } from "../components/columns";
+// 导入空状态组件, 当没有智能体数据时显示引导用户创建的界面
+import { EmptyState } from "@/components/empty-state";
+
 // 定义并导出 AgentsView 组件。这是显示智能体列表的核心界面。
 export const AgentsView = () => {
   // 调用 useTRPC 钩子, 获取一个 tRPC 客户端实例, 该实例已经配置好了与后端通信所需的一切。
@@ -24,11 +31,31 @@ export const AgentsView = () => {
   // 3. 成功后，它返回的 `data` 字段是确切有值的, 因此我们无需检查其是否存在。
   // `trpc.agents.getMany.queryOptions()` 创建了一个可重用的查询配置对象, 包含了查询键和查询函数。
   const { data } = useSuspenseQuery(trpc.agents.getMany.queryOptions());
-
-  // 当数据成功加载后, 组件会恢复渲染。
-  // 这里我们将获取到的 data 对象序列化成一个格式化的 JSON 字符串并显示在 div 中, 用于调试和展示。
-  // JSON.stringify(data, null, 2) 中的 null 和 2 参数用于美化输出, 使其更易读。
-  return <div>{JSON.stringify(data, null, 2)}</div>;
+  // 返回视图
+  return (
+    // 主容器: 使用 Flexbox 布局, 占满剩余空间, 设置内边距和垂直间距
+    // flex-1: 占满父容器的剩余空间
+    // pb-4: 底部内边距 1rem
+    // px-4 md:px-8: 水平内边距，小屏幕 1rem，中等屏幕及以上 2rem
+    // flex flex-col: 垂直 Flexbox 布局
+    // gap-y-4: 子元素之间的垂直间距 1rem
+    <div className="flex-1 pb-4 px-4 md:px-8 flex flex-col gap-y-4">
+      {/* 数据表格组件：显示智能体列表 */}
+      {/* data: 传入从后端获取的智能体数据数组 */}
+      {/* columns: 传入表格列定义，决定表格的结构和渲染方式 */}
+      <DataTable data={data} columns={columns} />
+      {/* 条件渲染：当智能体数据为空时显示空状态组件 */}
+      {/* 使用逻辑与运算符 && 进行条件渲染，只有当 data.length === 0 为真时才渲染 EmptyState */}
+      {data.length === 0 && (
+        <EmptyState
+          // 空状态标
+          title="创建你的第一个智能体"
+          // 空状态描述文字
+          description="创建智能体来加入您的会议。每位智能体都会遵循您的指示，并可以在通话期间与参与者互动。"
+        />
+      )}
+    </div>
+  );
 };
 
 // 定义并导出 AgentsViewLoading 组件。
