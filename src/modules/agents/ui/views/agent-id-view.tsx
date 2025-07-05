@@ -12,11 +12,22 @@ import { Badge } from "@/components/ui/badge";
 // 导入 tRPC 的客户端钩子, 用于在客户端组件中进行 API 调用
 import { useTRPC } from "@/trpc/client";
 // 导入 @tanstack/react-query 的 useSuspenseQuery 钩子, 它与 React Suspense 集成, 用于数据获取
-import { useSuspenseQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 // 从 lucide-react 库导入视频图标
 import { VideoIcon } from "lucide-react";
 // 导入此视图专用的头部组件
 import { AgentIdViewHeader } from "../components/agent-id-view-header";
+
+// 导入 Next.js 的路由钩子，用于客户端导航
+import { useRouter } from "next/navigation";
+// 导入 sonner 库的 toast 函数，用于显示通知
+import { toast } from "sonner";
+// 导入自定义的 useConfirm 钩子，用于显示确认对话框
+import { useConfirm } from "@/hooks/use-confirm";
 
 // 定义组件的 Props 接口
 interface Props {
@@ -26,6 +37,10 @@ interface Props {
 
 // AgentIdView 组件, 用于显示单个智能体的详细信息
 export const AgentIdView = ({ agentId }: Props) => {
+  // 初始化路由
+  const router = useRouter();
+  // 获取 react-query 的客户端实例，用于手动操作缓存
+  const queryClient = useQueryClient();
   // 初始化 tRPC 客户端
   const trpc = useTRPC();
   // 使用 useSuspenseQuery 从 tRPC 的 agents.getOne 端点获取数据
@@ -33,45 +48,89 @@ export const AgentIdView = ({ agentId }: Props) => {
   const { data } = useSuspenseQuery(
     trpc.agents.getOne.queryOptions({ id: agentId })
   );
+
+  // 使用 useMutation 钩子创建删除智能体的操作
+  const removeAgent = useMutation(
+    trpc.agents.remove.mutationOptions({
+      // 删除成功后的回调函数
+      onSuccess: async () => {
+        // 使缓存中的智能体列表查询失效，强制重新获取最新数据
+        await queryClient.invalidateQueries(
+          trpc.agents.getMany.queryOptions({})
+        );
+        // 删除成功后跳转到智能体列表页面
+        router.push("/agents");
+      },
+      // 删除失败时的错误处理
+      onError: (error) => {
+        // 显示错误提示信息
+        toast.error(error.message);
+      },
+    })
+  );
+
+  // 使用 useConfirm 钩子创建一个确认对话框实例
+  // 第一个参数是对话框的标题
+  // 第二个参数是对话框的描述，这里使用了模板字符串动态插入智能体名称
+  const [RemoveConfirmation, confirmRemove] = useConfirm(
+    "确认删除",
+    `确认删除智能体 ${data.name} 吗?`
+  );
+
+  // 定义处理移除智能体操作的异步函数
+  const handleRemoveAgent = async () => {
+    // 调用 confirmRemove 函数显示确认对话框，并等待用户操作
+    const ok = await confirmRemove();
+
+    // 如果用户点击了取消 (ok 为 false)，则直接返回，不执行任何操作
+    if (!ok) return;
+
+    // 如果用户确认，则调用 removeAgent 的 mutateAsync 方法来执行删除操作
+    await removeAgent.mutateAsync({ id: agentId });
+  };
+
   // 渲染组件的 JSX
   return (
-    <div className="flex-1 py-4 px-4 md:px-8 flex flex-col gap-y-4">
-      {/* 渲染视图头部, 传入 agentId、名称以及编辑和移除操作的回调函数 */}
-      <AgentIdViewHeader
-        agentId={agentId}
-        agentName={data.name}
-        onEdit={() => {}}
-        onRemove={() => {}}
-      />
-      {/* 主内容区域, 白色背景、圆角和边框 */}
-      <div className="bg-white rounded-lg border">
-        <div className="px-4 py-5 gap-y-5 flex flex-col col-span-5">
-          <div className="flex items-center gap-x-3">
-            {/* 显示生成的头像 */}
-            <GeneratedAvatar
-              variant="botttsNeutral"
-              // 使用智能体名称作为生成头像的种子
-              seed={data.name}
-              className="size-10"
-            />
-            {/* 显示智能体名称 */}
-            <h2 className="text-2xl font-medium">{data.name}</h2>
-          </div>
-          {/* 显示会议数量的徽章 */}
-          <Badge
-            variant="outline"
-            className="flex items-center gap-x-2 [&>svg]:size-4"
-          >
-            <VideoIcon className="text-blue-700" />5 会议
-          </Badge>
-          {/* 显示智能体的指令部分 */}
-          <div className="flex flex-col gap-y-4">
-            <p className="text-lg font-medium">Instructions</p>
-            <p className="text-neutral-800">{data.instructions}</p>
+    <>
+      <RemoveConfirmation />
+      <div className="flex-1 py-4 px-4 md:px-8 flex flex-col gap-y-4">
+        {/* 渲染视图头部, 传入 agentId、名称以及编辑和移除操作的回调函数 */}
+        <AgentIdViewHeader
+          agentId={agentId}
+          agentName={data.name}
+          onEdit={() => {}}
+          onRemove={handleRemoveAgent}
+        />
+        {/* 主内容区域, 白色背景、圆角和边框 */}
+        <div className="bg-white rounded-lg border">
+          <div className="px-4 py-5 gap-y-5 flex flex-col col-span-5">
+            <div className="flex items-center gap-x-3">
+              {/* 显示生成的头像 */}
+              <GeneratedAvatar
+                variant="botttsNeutral"
+                // 使用智能体名称作为生成头像的种子
+                seed={data.name}
+                className="size-10"
+              />
+              {/* 显示智能体名称 */}
+              <h2 className="text-2xl font-medium">{data.name}</h2>
+            </div>
+            {/* 显示会议数量的徽章 */}
+            <Badge
+              variant="outline"
+              className="flex items-center gap-x-2 [&>svg]:size-4"
+            >
+              <VideoIcon className="text-blue-700" />5 会议
+            </Badge>
+            {/* 显示智能体的指令部分 */}
+            <div className="flex flex-col gap-y-4">
+              <p className="text-lg font-medium">Instructions</p>
+              <p className="text-neutral-800">{data.instructions}</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

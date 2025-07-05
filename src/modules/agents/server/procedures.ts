@@ -9,7 +9,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 // import { TRPCError } from "@trpc/server";
 
 // 从模块的 schemas 文件中导入 agentsInsertSchema, 用于验证创建新智能体时输入的合法性
-import { agentsInsertSchema } from "../schemas";
+import { agentsInsertSchema, agentsUpdateSchema } from "../schemas";
 // 导入 Zod 库, 用于定义和验证数据结构。
 import { z } from "zod";
 // eq 函数用于在数据库查询中构建等于条件
@@ -138,5 +138,71 @@ export const agentsRouter = createTRPCRouter({
         .returning();
       // 返回新创建的代理对象
       return createdAgent;
+    }),
+  /**
+   * remove 变更过程 (Mutation Procedure)
+   * 用于删除指定ID的智能体
+   *
+   * @param {object} input - 输入参数对象
+   * @param {string} input.id - 要删除的智能体ID
+   * @returns {Promise<Agent>} 返回被删除的智能体信息
+   * @throws {TRPCError} 当找不到指定ID的智能体时抛出 NOT_FOUND 错误
+   */
+  remove: protectedProcedure
+    // 使用 Zod 验证输入参数必须包含字符串类型的 id
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // 从数据库中删除指定ID且属于当前用户的智能体
+      const [removedAgent] = await db
+        .delete(agents)
+        .where(
+          and(eq(agents.id, input.id), eq(agents.userId, ctx.auth.user.id))
+        )
+        .returning();
+
+      // 如果未找到要删除的智能体, 抛出错误
+      if (!removedAgent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "智能体未找到",
+        });
+      }
+
+      // 返回被删除的智能体信息
+      return removedAgent;
+    }),
+
+  /**
+   * update 变更过程 (Mutation Procedure)
+   * 用于更新指定ID的智能体信息
+   *
+   * @param {object} input - 符合 agentsUpdateSchema 的输入参数对象
+   * @param {string} input.id - 要更新的智能体ID
+   * @returns {Promise<Agent>} 返回更新后的智能体信息
+   * @throws {TRPCError} 当找不到指定ID的智能体时抛出 NOT_FOUND 错误
+   */
+  update: protectedProcedure
+    // 使用 agentsUpdateSchema 验证更新数据的格式
+    .input(agentsUpdateSchema)
+    .mutation(async ({ ctx, input }) => {
+      // 更新数据库中指定ID且属于当前用户的智能体信息
+      const [updatedAgent] = await db
+        .update(agents)
+        .set(input)
+        .where(
+          and(eq(agents.id, input.id), eq(agents.userId, ctx.auth.user.id))
+        )
+        .returning();
+
+      // 如果未找到要更新的智能体, 抛出错误
+      if (!updatedAgent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "智能体未找到",
+        });
+      }
+
+      // 返回更新后的智能体信息
+      return updatedAgent;
     }),
 });

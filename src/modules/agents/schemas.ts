@@ -19,3 +19,13 @@ export const agentsInsertSchema = z.object({
     // 字符串长度至少为1, 如果为空则返回指定的错误消息
     .min(1, { message: "指令是必填项" }),
 });
+
+// agentsUpdateSchema 是一个用于验证更新智能体数据的 schema
+// 它继承了 agentsInsertSchema 的所有验证规则 (name 和 instructions)
+// 并通过 extend 方法扩展了新的验证规则
+export const agentsUpdateSchema = agentsInsertSchema.extend({
+  // 添加 id 字段的验证规则
+  // id 必须是字符串类型
+  // 字符串长度至少为1, 如果为空则返回错误消息
+  id: z.string().min(1, { message: "ID 是必要字段" }),
+});
