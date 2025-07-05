@@ -18,6 +18,9 @@ import { and, count, desc, eq, ilike } from "drizzle-orm";
 // 导入 Zod，一个用于数据验证的库
 import { z } from "zod";
 
+// 从 meetings 模块的 schemas 文件中导入 Zod 验证 schema，用于校验创建和更新会议时的输入数据。
+import { meetingsInsertSchema, meetingsUpdateSchema } from "../schemas";
+
 // 使用 createTRPCRouter 创建一个名为 meetingsRouter 的 tRPC 路由
 export const meetingsRouter = createTRPCRouter({
   /**
@@ -112,5 +115,58 @@ export const meetingsRouter = createTRPCRouter({
 
       // 返回查询到的会议对象
       return existingMeeting;
+    }),
+
+  // 定义一个名为 create 的受保护的 procedure, 用于创建新的会议记录。
+  create: protectedProcedure
+    // 使用从 ../schemas 导入的 meetingsInsertSchema 来验证客户端传入的输入数据。
+    // input 方法确保只有符合 meetingsInsertSchema 结构的数据才能进入 mutation。
+    .input(meetingsInsertSchema)
+    // .mutation 定义了此 procedure 的核心逻辑, 它会修改数据库。
+    .mutation(async ({ input, ctx }) => {
+      // 在 meetings 表中插入一条新的记录。
+      const [createdMeeting] = await db
+        .insert(meetings)
+        // values 指定了要插入的数据。这里我们将客户端提供的 input 数据
+        // 与当前认证用户的 ID 合并, 以确保会议记录与用户关联。
+        .values({ ...input, userId: ctx.auth.user.id })
+        // returning 方法指定在插入操作成功后, 返回新创建的完整记录。
+        .returning();
+      // 将新创建的会议对象返回给客户端。
+      return createdMeeting;
+    }),
+
+  // 定义一个名为 update 的受保护的 procedure, 用于更新已存在的会议记录。
+  update: protectedProcedure
+    // 使用 meetingsUpdateSchema 来验证客户端传入的更新数据。
+    // 这确保了更新操作所需的所有字段 (如 ID) 都存在且格式正确。
+    .input(meetingsUpdateSchema)
+    .mutation(async ({ ctx, input }) => {
+      // 在 meetings 表中更新一条记录。
+      const [updatedMeeting] = await db
+        .update(meetings)
+        // set 方法指定要更新的字段, 这里使用客户端传入的 input 数据。
+        .set(input)
+        // where 子句用于定位要更新的记录。
+        // and 函数确保只有同时满足以下两个条件的记录才会被更新：
+        // 1. meetings.id 与 input.id 匹配。
+        // 2. meetings.userId 与当前认证用户的 ID 匹配, 防止用户修改不属于自己的会议。
+        .where(
+          and(eq(meetings.id, input.id), eq(meetings.userId, ctx.auth.user.id))
+        )
+        // returning 方法指定在更新操作成功后, 返回更新后的完整记录。
+        .returning();
+
+      // 如果 updatedMeeting 为空, 意味着没有找到匹配的记录 (可能因为会议 ID 不存在或不属于当前用户)。
+      if (!updatedMeeting) {
+        // 抛出一个 TRPCError 错误, 告知客户端请求的资源未找到。
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "会议未找到",
+        });
+      }
+
+      // 将更新后的会议对象返回给客户端。
+      return updatedMeeting;
     }),
 });
