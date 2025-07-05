@@ -28,6 +28,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 // 导入自定义的 useConfirm 钩子，用于显示确认对话框
 import { useConfirm } from "@/hooks/use-confirm";
+// 导入 React 的 useState 钩子，用于在组件中管理状态
+import { useState } from "react";
+// 导入更新智能体对话框组件
+import { UpdateAgentDialog } from "../components/update-agent-dialog";
 
 // 定义组件的 Props 接口
 interface Props {
@@ -48,6 +52,9 @@ export const AgentIdView = ({ agentId }: Props) => {
   const { data } = useSuspenseQuery(
     trpc.agents.getOne.queryOptions({ id: agentId })
   );
+  // 使用 useState 钩子定义一个状态变量 updateAgentDialogOpen，
+  // 用于控制更新智能体对话框的打开和关闭状态，初始值为 false (关闭)
+  const [updateAgentDialogOpen, setUpdateAgentDialogOpen] = useState(false);
 
   // 使用 useMutation 钩子创建删除智能体的操作
   const removeAgent = useMutation(
@@ -92,13 +99,24 @@ export const AgentIdView = ({ agentId }: Props) => {
   // 渲染组件的 JSX
   return (
     <>
+      {/* 渲染移除确认对话框组件 */}
       <RemoveConfirmation />
+      {/* 渲染更新智能体对话框组件 */}
+      <UpdateAgentDialog
+        // 将对话框的打开状态与 state 绑定
+        open={updateAgentDialogOpen}
+        // 当对话框状态改变时，更新 state
+        onOpenChange={setUpdateAgentDialogOpen}
+        // 传入智能体的当前数据作为表单的初始值
+        initialValues={data}
+      />
       <div className="flex-1 py-4 px-4 md:px-8 flex flex-col gap-y-4">
         {/* 渲染视图头部, 传入 agentId、名称以及编辑和移除操作的回调函数 */}
         <AgentIdViewHeader
           agentId={agentId}
           agentName={data.name}
-          onEdit={() => {}}
+          // 点击编辑按钮时, 将 updateAgentDialogOpen 状态设置为 true，从而打开对话框
+          onEdit={() => setUpdateAgentDialogOpen(true)}
           onRemove={handleRemoveAgent}
         />
         {/* 主内容区域, 白色背景、圆角和边框 */}
