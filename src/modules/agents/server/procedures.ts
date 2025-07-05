@@ -22,6 +22,9 @@ import {
   MIN_PAGE_SIZE,
 } from "@/constants";
 
+// 导入 TRPCError 用于处理 API 错误
+import { TRPCError } from "@trpc/server";
+
 // 创建并导出 agents 相关的 tRPC 路由
 export const agentsRouter = createTRPCRouter({
   /**
@@ -96,13 +99,22 @@ export const agentsRouter = createTRPCRouter({
   getOne: protectedProcedure
     // 使用 Zod 定义输入验证, 确保 id 是一个字符串
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       // 根据传入的 id 在 agents 表中查询匹配的记录
       const [existingAgent] = await db
         .select()
         .from(agents)
         // eq 函数用于创建 `agents.id = input.id` 的查询条件
-        .where(eq(agents.id, input.id));
+        .where(
+          and(eq(agents.id, input.id), eq(agents.userId, ctx.auth.user.id))
+        );
+
+      // 如果没有查询到智能体
+      if (!existingAgent) {
+        // 抛出错误
+        throw new TRPCError({ code: "NOT_FOUND", message: "智能体未找到" });
+      }
+
       // 返回查询到的单个代理对象, 如果未找到则为 undefined
       return existingAgent;
     }),

@@ -22,9 +22,13 @@ import { EmptyState } from "@/components/empty-state";
 import { useAgentsFilters } from "../../hooks/use-agents-filters";
 // 导入分页组件
 import { DataPagination } from "../components/data-pagination";
+// 导入 Next.js 路由器钩子
+import { useRouter } from "next/navigation";
 
 // 定义并导出 AgentsView 组件。这是显示智能体列表的核心界面。
 export const AgentsView = () => {
+  // 获取路由器对象
+  const router = useRouter();
   // 使用智能体过滤器钩子获取当前的过滤条件
   // 这里只解构出 filters, 不需要 setFilters 函数, 因为这个组件只读取过滤条件
   const [filters, setFilters] = useAgentsFilters();
@@ -55,7 +59,11 @@ export const AgentsView = () => {
       {/* 数据表格组件：显示智能体列表 */}
       {/* data: 传入从后端获取的智能体数据数组 */}
       {/* columns: 传入表格列定义，决定表格的结构和渲染方式 */}
-      <DataTable data={data.items} columns={columns} />
+      <DataTable
+        data={data.items}
+        columns={columns}
+        onRowClick={(row) => router.push(`/agents/${row.id}`)}
+      />
       {/* 渲染分页组件 */}
       <DataPagination
         page={filters.page}
