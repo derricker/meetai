@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
 
 // 用户表定义
@@ -129,4 +129,52 @@ export const agents = pgTable("agents", {
     // 设置默认值为当前时间戳, 注意: 这只在创建时生效。
     // 如果需要在每次更新时自动更新此字段, 通常需要使用数据库触发器或在应用层代码中实现
     .defaultNow(),
+});
+
+// 定义会议状态的枚举类型
+// - upcoming: 即将开始的会议
+// - active: 正在进行中的会议
+// - completed: 已完成的会议
+// - processing: 正在处理中的会议 (如转写、生成摘要等)
+// - cancelled: 已取消的会议
+export const meetingStatus = pgEnum("meeting_status", [
+  "upcoming",
+  "active",
+  "completed",
+  "processing",
+  "cancelled",
+]);
+
+// 会议表定义
+export const meetings = pgTable("meetings", {
+  // 会议唯一标识符, 使用 nanoid 自动生成
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  // 会议名称, 不能为空
+  name: text("name").notNull(),
+  // 会议创建者的用户ID, 关联到用户表, 级联删除
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  // 会议关联的 AI 助手ID, 关联到 agents 表, 级联删除
+  agentId: text("agent_id")
+    .notNull()
+    .references(() => agents.id, { onDelete: "cascade" }),
+  // 会议当前状态, 默认为"即将开始"
+  status: meetingStatus("status").notNull().default("upcoming"),
+  // 会议开始时间
+  startedAt: timestamp("started_at"),
+  // 会议结束时间
+  endedAt: timestamp("ended_at"),
+  // 会议文字记录的 URL 地址
+  transcriptUrl: text("transcript_url"),
+  // 会议录音/录像的 URL 地址
+  recordingUrl: text("recording_url"),
+  // 会议内容摘要
+  summary: text("summary"),
+  // 记录创建时间, 自动设置为当前时间
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  // 记录更新时间, 自动设置为当前时间
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

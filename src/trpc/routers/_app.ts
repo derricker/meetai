@@ -1,4 +1,5 @@
 // createTRPCRouter: 这是用于创建路由的函数
+import { meetingsRouter } from "@/modules/meetings/server/procedures";
 import { createTRPCRouter } from "../init";
 import { agentsRouter } from "@/modules/agents/server/procedures";
 
@@ -7,6 +8,7 @@ import { agentsRouter } from "@/modules/agents/server/procedures";
 // 你可以把 appRouter 想象成你整个后端 API 的根节点
 export const appRouter = createTRPCRouter({
   agents: agentsRouter,
+  meetings: meetingsRouter,
 });
 
 // 这是 tRPC 实现端到端类型安全的关键魔法之一
