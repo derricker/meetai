@@ -8,13 +8,13 @@ import {
 // 导入数据库实例，用于执行数据库操作
 import { db } from "@/db";
 // 导入数据库 schema 中的 meetings 表定义
-import { meetings } from "@/db/schema";
+import { agents, meetings } from "@/db/schema";
 // 导入 tRPC 的路由创建函数和受保护的过程，用于定义 API 端点
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 // 导入 tRPC 的错误类，用于抛出标准化的 API 错误
 import { TRPCError } from "@trpc/server";
 // 导入 Drizzle ORM 的查询操作符，用于构建 SQL 查询
-import { and, count, desc, eq, ilike } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
 // 导入 Zod，一个用于数据验证的库
 import { z } from "zod";
 
@@ -63,8 +63,15 @@ export const meetingsRouter = createTRPCRouter({
 
       // 执行查询以获取分页后的数据
       const data = await db
-        .select()
+        .select({
+          ...getTableColumns(meetings),
+          agent: agents,
+          duration: sql<number>`EXTRACT(EPOCH FROM (ended_at - started_at))`.as(
+            "duration"
+          ),
+        })
         .from(meetings)
+        .innerJoin(agents, eq(meetings.agentId, agents.id))
         .where(whereCondition)
         // 按创建时间降序排序，保证最新创建的会议在前
         .orderBy(desc(meetings.createdAt), desc(meetings.id))
@@ -77,6 +84,7 @@ export const meetingsRouter = createTRPCRouter({
       const [total] = await db
         .select({ count: count() })
         .from(meetings)
+        .innerJoin(agents, eq(meetings.agentId, agents.id))
         .where(whereCondition);
 
       // 根据总记录数和每页数量计算总页数

@@ -12,8 +12,6 @@ import { useTRPC } from "@/trpc/client";
 // 这是 useQuery 的一个变体，它专门设计用来与 React Suspense 和 ErrorBoundary 集成。
 import { useSuspenseQuery } from "@tanstack/react-query";
 
-// 导入数据表格组件, 用于显示智能体列表的表格界面
-import { DataTable } from "../components/data-table";
 // 导入表格列定义, 定义了智能体表格的列结构和渲染方式
 import { columns } from "../components/columns";
 // 导入空状态组件, 当没有智能体数据时显示引导用户创建的界面
@@ -24,6 +22,8 @@ import { useAgentsFilters } from "../../hooks/use-agents-filters";
 import { DataPagination } from "../components/data-pagination";
 // 导入 Next.js 路由器钩子
 import { useRouter } from "next/navigation";
+// 导入数据表格组件, 用于显示智能体列表的表格界面
+import { DataTable } from "@/components/data-table";
 
 // 定义并导出 AgentsView 组件。这是显示智能体列表的核心界面。
 export const AgentsView = () => {

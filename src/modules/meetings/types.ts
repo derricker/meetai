@@ -11,3 +11,10 @@ import type { AppRouter } from "@/trpc/routers/_app";
 // inferRouterOutputs<AppRouter> 推断出整个 AppRouter 的所有输出类型
 // ["meetings"]["getOne"] 访问了 meetings 路由器下 getOne 过程的输出类型
 export type MeetingGetOne = inferRouterOutputs<AppRouter>["meetings"]["getOne"];
+
+// 定义并导出 MeetingGetMany 类型
+// 这个类型代表了调用 tRPC 的 meetings.getMany 过程后返回的数据列表
+// inferRouterOutputs<AppRouter> 推断出整个 AppRouter 的所有输出类型
+// ["meetings"]["getMany"]["items"] 访问了 meetings 路由器下 getMany 过程返回的数据项数组
+export type MeetingGetMany =
+  inferRouterOutputs<AppRouter>["meetings"]["getMany"]["items"];

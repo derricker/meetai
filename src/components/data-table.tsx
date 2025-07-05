@@ -93,7 +93,7 @@ export function DataTable<TData, TValue>({
                 // 设置高度、居中对齐和弱化文字颜色
                 className="h-19 text-center text-muted-foreground"
               >
-                未找到任何智能体
+                未找到任何选项
               </TableCell>
             </TableRow>
           )}

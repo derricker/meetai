@@ -10,6 +10,13 @@ import { useTRPC } from "@/trpc/client";
 // 从 @tanstack/react-query 导入 useSuspenseQuery 钩子, 它与 React Suspense 集成, 用于数据获取。
 import { useSuspenseQuery } from "@tanstack/react-query";
 
+// 导入表格列的配置信息，包含了表格每一列的定义（如列标题、数据渲染方式等）
+import { columns } from "../components/columns";
+// 导入通用数据表格组件，用于展示结构化数据，支持排序、筛选等功能
+import { DataTable } from "@/components/data-table";
+// 导入空状态组件，用于在没有数据时显示友好的提示信息和引导用户操作
+import { EmptyState } from "@/components/empty-state";
+
 /**
  * MeetingsView 组件
  * 该组件负责获取并显示会议列表。
@@ -22,7 +29,17 @@ export const MeetingsView = () => {
   // 这个钩子会自动处理加载状态, 在数据准备好之前, 父组件的 Suspense fallback 将被显示。
   const { data } = useSuspenseQuery(trpc.meetings.getMany.queryOptions({}));
   // 渲染获取到的数据，这里临时使用 JSON.stringify 进行展示。
-  return <div>{JSON.stringify(data)}</div>;
+  return (
+    <div className="flex-1 pb-4 px-4 md:px-8 flex flex-col gap-y-4">
+      <DataTable data={data.items} columns={columns} />
+      {data.items.length === 0 && (
+        <EmptyState
+          title="创建你的第一个会议"
+          description="创建你的第一个会议, 与其他用户一起协作, 分享想法, 实时互动"
+        />
+      )}
+    </div>
+  );
 };
 
 /**
