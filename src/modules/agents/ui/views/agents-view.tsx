@@ -19,7 +19,7 @@ import { EmptyState } from "@/components/empty-state";
 // 导入智能体过滤器钩子, 用于获取当前的过滤条件状态
 import { useAgentsFilters } from "../../hooks/use-agents-filters";
 // 导入分页组件
-import { DataPagination } from "../components/data-pagination";
+import { DataPagination } from "@/components/data-pagination";
 // 导入 Next.js 路由器钩子
 import { useRouter } from "next/navigation";
 // 导入数据表格组件, 用于显示智能体列表的表格界面

@@ -17,6 +17,8 @@ import { useAgentsFilters } from "../../hooks/use-agents-filters";
 import { DEFAULT_PAGE } from "@/constants";
 // 导入智能体搜索过滤器组件
 import { AgentsSearchFilter } from "./agents-search-filter";
+
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 /**
  * AgentsListHeader 组件
  * 这个组件负责渲染智能体列表页面的头部区域
@@ -61,18 +63,21 @@ export const AgentsListHeader = () => {
             创建新智能体
           </Button>
         </div>
-        {/* 搜索过滤器区域，使用flex布局并设置间距 */}
-        <div className="flex items-center gap-x-2 p-1">
-          {/* 渲染智能体搜索过滤器组件 */}
-          <AgentsSearchFilter />
-          {/* 当有过滤条件被修改时，显示清除按钮 */}
-          {isAnyFilterModified && (
-            <Button variant="outline" size="sm" onClick={onClearFilters}>
-              <XCircleIcon /> {/* 显示X形圆圈图标 */}
-              清除
-            </Button>
-          )}
-        </div>
+        <ScrollArea>
+          {/* 搜索过滤器区域，使用flex布局并设置间距 */}
+          <div className="flex items-center gap-x-2 p-1">
+            {/* 渲染智能体搜索过滤器组件 */}
+            <AgentsSearchFilter />
+            {/* 当有过滤条件被修改时，显示清除按钮 */}
+            {isAnyFilterModified && (
+              <Button variant="outline" size="sm" onClick={onClearFilters}>
+                <XCircleIcon /> {/* 显示X形圆圈图标 */}
+                清除
+              </Button>
+            )}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
     </>
   );

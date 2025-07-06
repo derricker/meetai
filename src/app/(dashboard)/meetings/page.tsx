@@ -22,8 +22,24 @@ import { redirect } from "next/navigation";
 // 导入身份验证相关的工具函数，用于处理用户认证和会话管理
 import { auth } from "@/lib/auth";
 
+// 导入 loadSearchParams 函数，用于处理和加载搜索参数
+// 该函数负责解析和验证 URL 查询字符串中的搜索参数
+import { loadSearchParams } from "@/modules/meetings/params";
+
+// 导入 SearchParams 类型，定义了搜索参数的数据结构
+// 来自 nuqs 库，用于处理 URL 查询字符串的类型安全管理
+import { SearchParams } from "nuqs";
+
+// 定义页面组件的属性接口
+interface Props {
+  // searchParams 属性是一个 Promise<SearchParams> 类型
+  // 用于异步接收和处理 URL 查询参数
+  // 这些参数可能包含过滤、排序等会议列表的查询条件
+  searchParams: Promise<SearchParams>;
+}
+
 // 定义页面组件
-const page = async () => {
+const page = async ({ searchParams }: Props) => {
   // 获取当前用户会话信息
   const session = await auth.api.getSession({
     headers: await headers(), // 传入请求头信息用于会话验证
@@ -32,11 +48,20 @@ const page = async () => {
   // 如果没有有效会话，重定向到登录页面
   if (!session) return redirect("/sign-in");
 
+  // 使用 loadSearchParams 函数处理并加载搜索参数
+  // 等待异步解析 searchParams，转换为过滤器对象
+  // filters 将包含用于查询会议列表的各种过滤条件
+  const filters = await loadSearchParams(searchParams);
+
   // 获取查询客户端实例
   const queryClient = getQueryClient();
   // 在服务器端预取 getMany 查询的数据，这样页面首次加载时数据就已经可用
   // `void` 关键字用于表示我们不关心 prefetchQuery 的返回值
-  void queryClient.prefetchQuery(trpc.meetings.getMany.queryOptions({}));
+  void queryClient.prefetchQuery(
+    trpc.meetings.getMany.queryOptions({
+      ...filters,
+    })
+  );
   return (
     <>
       {/* MeetingsListHeader 会议页面头部组件 */}

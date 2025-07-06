@@ -18,3 +18,17 @@ export type MeetingGetOne = inferRouterOutputs<AppRouter>["meetings"]["getOne"];
 // ["meetings"]["getMany"]["items"] 访问了 meetings 路由器下 getMany 过程返回的数据项数组
 export type MeetingGetMany =
   inferRouterOutputs<AppRouter>["meetings"]["getMany"]["items"];
+
+// 定义会议状态的枚举类型
+export enum MeetingStatus {
+  // 即将开始的会议
+  Upcoming = "upcoming",
+  // 正在进行中的会议
+  Active = "active",
+  // 已完成的会议
+  Completed = "completed",
+  // 正在处理中的会议 (例如: 正在生成会议记录)
+  Processing = "processing",
+  // 已取消的会议
+  Cancelled = "cancelled",
+}

@@ -20,48 +20,78 @@ import { z } from "zod";
 
 // 从 meetings 模块的 schemas 文件中导入 Zod 验证 schema，用于校验创建和更新会议时的输入数据。
 import { meetingsInsertSchema, meetingsUpdateSchema } from "../schemas";
+// 导入会议状态枚举
+import { MeetingStatus } from "../types";
 
 // 使用 createTRPCRouter 创建一个名为 meetingsRouter 的 tRPC 路由
 export const meetingsRouter = createTRPCRouter({
   /**
-   * getMany 查询过程 (Query Procedure)
-   * 用于分页获取当前认证用户的所有会议列表，并支持按会议名称进行搜索。
+   * getMany 查询过程
+   * 该方法用于获取会议列表，支持分页、搜索和多种筛选功能
    *
-   * @param {object} input - 输入参数对象。
-   * @param {number} input.page - 请求的页码，默认为 DEFAULT_PAGE。
-   * @param {number} input.pageSize - 每页返回的记录数，受 MIN_PAGE_SIZE 和 MAX_PAGE_SIZE 限制，默认为 DEFAULT_PAGE_SIZE。
-   * @param {string|null} input.search - 可选的搜索关键词，用于按会议名称进行模糊过滤。
-   * @returns {Promise<{items: Meeting[], total: number, totalPages: number}>} 返回一个包含当前页数据、总记录数和总页数的对象。
+   * 功能说明:
+   * 1. 分页获取当前用户的会议列表
+   * 2. 支持按会议名称进行模糊搜索
+   * 3. 支持按AI助手ID筛选
+   * 4. 支持按会议状态筛选
+   * 5. 自动计算会议持续时间
+   * 6. 返回分页信息和会议总数
+   *
+   * 输入参数:
+   * @param {number} page - 页码，从1开始，默认为1
+   * @param {number} pageSize - 每页记录数，默认10，最小1，最大100
+   * @param {string} search - 可选，会议名称搜索关键词
+   * @param {string} agentId - 可选，AI助手ID
+   * @param {MeetingStatus} status - 可选，会议状态(即将开始/进行中/已完成/处理中/已取消)
+   *
+   * 返回数据:
+   * @returns {Promise<{
+   *   items: Array<Meeting & {agent: Agent, duration: number}>, // 会议列表，包含AI助手信息和会议时长
+   *   total: number,    // 总记录数
+   *   totalPages: number // 总页数
+   * }>}
    */
   getMany: protectedProcedure
-    // 使用 Zod 定义输入参数的验证 schema
     .input(
       z.object({
-        // page 是一个数字，默认为 1
         page: z.number().default(DEFAULT_PAGE),
-        // pageSize 是一个数字，有最小和最大限制，默认为 10
         pageSize: z
           .number()
           .min(MIN_PAGE_SIZE)
           .max(MAX_PAGE_SIZE)
           .default(DEFAULT_PAGE_SIZE),
-        // search 是一个可选的字符串
         search: z.string().nullish(),
+        agentId: z.string().nullish(),
+        status: z
+          .enum([
+            MeetingStatus.Upcoming,
+            MeetingStatus.Active,
+            MeetingStatus.Completed,
+            MeetingStatus.Processing,
+            MeetingStatus.Cancelled,
+          ])
+          .nullish(),
       })
     )
-    // 定义查询的实现
     .query(async ({ ctx, input }) => {
-      const { page, pageSize, search } = input;
+      const { page, pageSize, search, agentId, status } = input;
 
-      // 构建查询条件：
-      // 1. 会议必须属于当前登录用户 (eq(meetings.userId, ctx.auth.user.id))
-      // 2. 如果提供了 search 关键词，则添加名称的模糊匹配条件 (ilike)
+      // 构建多条件查询
+      // 1. 必须是当前用户的会议
+      // 2. 如果有搜索关键词，进行会议名称的模糊匹配
+      // 3. 如果指定了会议状态，添加状态筛选
+      // 4. 如果指定了AI助手ID，添加助手筛选
       const whereCondition = and(
         eq(meetings.userId, ctx.auth.user.id),
-        search ? ilike(meetings.name, `%${search}%`) : undefined
+        search ? ilike(meetings.name, `%${search}%`) : undefined,
+        status ? eq(meetings.status, status) : undefined,
+        agentId ? eq(meetings.agentId, agentId) : undefined
       );
 
-      // 执行查询以获取分页后的数据
+      // 查询会议列表
+      // 1. 获取会议表的所有字段
+      // 2. 关联查询AI助手信息
+      // 3. 计算会议持续时间(秒)
       const data = await db
         .select({
           ...getTableColumns(meetings),
@@ -73,28 +103,25 @@ export const meetingsRouter = createTRPCRouter({
         .from(meetings)
         .innerJoin(agents, eq(meetings.agentId, agents.id))
         .where(whereCondition)
-        // 按创建时间降序排序，保证最新创建的会议在前
         .orderBy(desc(meetings.createdAt), desc(meetings.id))
-        // 设置每页数量
         .limit(pageSize)
-        // 计算偏移量，用于分页
         .offset((page - 1) * pageSize);
 
-      // 执行另一个查询以获取满足条件的总记录数
+      // 获取符合条件的会议总数
       const [total] = await db
         .select({ count: count() })
         .from(meetings)
         .innerJoin(agents, eq(meetings.agentId, agents.id))
         .where(whereCondition);
 
-      // 根据总记录数和每页数量计算总页数
+      // 计算总页数
       const totalPages = Math.ceil(total.count / pageSize);
 
-      // 返回格式化的响应数据
+      // 返回会议列表、总数和分页信息
       return {
-        items: data, // 当前页的会议列表
-        total: total.count, // 总记录数
-        totalPages, // 总页数
+        items: data,
+        total: total.count,
+        totalPages,
       };
     }),
   /**
