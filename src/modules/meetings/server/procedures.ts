@@ -125,30 +125,53 @@ export const meetingsRouter = createTRPCRouter({
       };
     }),
   /**
-   * getOne 查询过程 (Query Procedure)
-   * 用于根据指定的 ID 获取单个会议的详细信息。
-   * @param {object} input - 输入对象，必须包含一个字符串类型的 id。
+   * getOne 查询过程
+   * 用于获取单个会议的详细信息
+   *
+   * 功能说明:
+   * 1. 根据会议ID获取单个会议的完整信息
+   * 2. 确保用户只能查看自己的会议
+   * 3. 返回会议详情，包含关联的AI助手信息和会议时长
+   *
+   * 输入参数:
+   * @param {string} id - 要查询的会议ID
+   *
+   * 返回数据:
+   * @returns {Promise<Meeting & {agent: Agent, duration: number}>} - 返回会议详情，包含AI助手信息和会议时长(秒)
+   *
+   * 错误处理:
+   * - 如果会议不存在或不属于当前用户，抛出 NOT_FOUND 错误
    */
   getOne: protectedProcedure
-    // 使用 Zod 定义输入验证，确保 id 是一个非空字符串
+    // 使用 Zod 定义输入验证 schema，要求必须提供会议 ID
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      // 根据传入的 id 和当前用户 ID 在 meetings 表中查询匹配的记录
+      // 构建查询，获取会议详情
+      // 1. 选择会议表的所有字段
+      // 2. 关联查询AI助手信息
+      // 3. 计算会议持续时间(以秒为单位)
       const [existingMeeting] = await db
-        .select()
+        .select({
+          ...getTableColumns(meetings),
+          agent: agents,
+          duration: sql<number>`EXTRACT(EPOCH FROM (ended_at - started_at))`.as(
+            "duration"
+          ),
+        })
         .from(meetings)
-        // 查询条件：ID 匹配且 userId 匹配
+        // 关联 agents 表获取AI助手信息
+        .innerJoin(agents, eq(meetings.agentId, agents.id))
+        // 查询条件：确保会议ID匹配且属于当前用户
         .where(
           and(eq(meetings.id, input.id), eq(meetings.userId, ctx.auth.user.id))
         );
 
-      // 如果没有找到匹配的会议记录
+      // 如果未找到匹配的会议记录，抛出 NOT_FOUND 错误
       if (!existingMeeting) {
-        // 抛出一个 "NOT_FOUND" 错误
         throw new TRPCError({ code: "NOT_FOUND", message: "会议未找到" });
       }
 
-      // 返回查询到的会议对象
+      // 返回查询到的会议详情
       return existingMeeting;
     }),
 
@@ -203,5 +226,52 @@ export const meetingsRouter = createTRPCRouter({
 
       // 将更新后的会议对象返回给客户端。
       return updatedMeeting;
+    }),
+
+  /**
+   * remove 删除过程
+   * 该方法用于删除指定ID的会议记录
+   *
+   * 功能说明:
+   * 1. 验证用户权限，确保只能删除自己的会议
+   * 2. 根据会议ID删除对应的会议记录
+   * 3. 如果会议不存在则抛出错误
+   *
+   * 输入参数:
+   * @param {string} id - 要删除的会议ID
+   *
+   * 返回数据:
+   * @returns {Promise<Meeting>} - 返回被删除的会议记录
+   *
+   * 错误处理:
+   * - 如果会议不存在或不属于当前用户，抛出 NOT_FOUND 错误
+   */
+  remove: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // 执行删除操作，并返回被删除的会议记录
+      const [removedMeeting] = await db
+        .delete(meetings)
+        // 使用 where 子句确保只删除属于当前用户的指定会议
+        .where(
+          and(eq(meetings.id, input.id), eq(meetings.userId, ctx.auth.user.id))
+        )
+        // 返回被删除的会议记录信息
+        .returning();
+
+      // 如果没有找到要删除的会议记录，抛出错误
+      if (!removedMeeting) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "会议未找到",
+        });
+      }
+
+      // 返回被删除的会议记录
+      return removedMeeting;
     }),
 });
