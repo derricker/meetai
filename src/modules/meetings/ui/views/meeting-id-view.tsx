@@ -22,6 +22,15 @@ import { UpdateMeetingDialog } from "../components/update-meeting-dialog";
 // 导入 React 的 useState Hook，用于管理组件的局部状态。
 import { useState } from "react";
 
+// 导入会议已取消状态的展示组件
+import { CancelledState } from "../components/cancelled-state";
+// 导入会议处理中状态的展示组件
+import { ProcessingState } from "../components/processing-state";
+// 导入会议进行中状态的展示组件
+import { ActiveState } from "../components/active-state";
+// 导入即将开始的会议状态的展示组件
+import { UpcomingState } from "../components/upcoming-state";
+
 // 定义组件的 Props 接口。
 interface Props {
   meetingId: string; // 会议的唯一标识符。
@@ -77,6 +86,17 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     await removeMeeting.mutateAsync({ id: meetingId });
   };
 
+  // 判断会议是否处于进行中状态
+  const isActive = data.status === "active";
+  // 判断会议是否处于即将开始状态
+  const isUpcoming = data.status === "upcoming";
+  // 判断会议是否已被取消
+  const isCancelled = data.status === "cancelled";
+  // 判断会议是否已完成
+  const isCompleted = data.status === "completed";
+  // 判断会议是否正在处理中（例如：正在生成会议记录等）
+  const isProcessing = data.status === "processing";
+
   // 组件渲染内容。
   return (
     <>
@@ -97,6 +117,11 @@ export const MeetingIdView = ({ meetingId }: Props) => {
           onEdit={() => setUpdateMeetingDialogOpen(true)} // 编辑按钮点击时打开更新会议对话框。
           onRemove={handleRemoveMeeting} // 删除按钮点击时触发删除会议操作。
         />
+        {isCancelled && <CancelledState />}
+        {isProcessing && <ProcessingState />}
+        {isCompleted && <p>会议已完成</p>}
+        {isActive && <ActiveState meetingId={meetingId} />}
+        {isUpcoming && <UpcomingState meetingId={meetingId} />}
       </div>
     </>
   );
