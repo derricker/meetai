@@ -23,8 +23,60 @@ import { meetingsInsertSchema, meetingsUpdateSchema } from "../schemas";
 // 导入会议状态枚举
 import { MeetingStatus } from "../types";
 
+// 导入 streamVideo 工具函数, 该函数提供了视频流相关的核心功能: 创建和管理视频会议、处理实时视频流、管理会议参与者等
+import { streamVideo } from "@/lib/stream-video";
+// 导入 generateAvatarUri 工具函数, 该函数用于: 为用户和AI助手生成头像、支持多种头像样式(initials、bottts等)等
+import { generateAvatarUri } from "@/lib/avatar";
+
 // 使用 createTRPCRouter 创建一个名为 meetingsRouter 的 tRPC 路由
 export const meetingsRouter = createTRPCRouter({
+  /**
+   * generateToken 令牌生成过程
+   * 该方法用于生成视频会议所需的用户访问令牌
+   *
+   * 功能说明:
+   * 1. 在视频服务中创建或更新用户信息
+   * 2. 生成一个有效期为1小时的访问令牌
+   *
+   * 处理流程:
+   * 1. 首先通过 upsertUsers 在视频服务中更新用户信息:
+   *    - 设置用户ID和名称
+   *    - 分配管理员角色
+   *    - 设置用户头像(优先使用现有头像, 否则生成默认头像)
+   * 2. 计算令牌的过期时间和签发时间
+   * 3. 生成并返回访问令牌
+   *
+   * 返回数据:
+   * @returns {Promise<string>} - 返回生成的访问令牌
+   */
+  generateToken: protectedProcedure.mutation(async ({ ctx }) => {
+    // 在视频服务中创建或更新用户信息
+    await streamVideo.upsertUsers([
+      {
+        id: ctx.auth.user.id,
+        name: ctx.auth.user.name,
+        role: "admin",
+        image:
+          ctx.auth.user.image ??
+          generateAvatarUri({ seed: ctx.auth.user.name, variant: "initials" }),
+      },
+    ]);
+
+    // 计算令牌过期时间(当前时间 + 1小时)、1小时后过期
+    const expirationTime = Math.floor(Date.now() / 1000) + 3600;
+    // 计算令牌签发时间(当前时间 - 1分钟, 留出时间缓冲)
+    const issuedAt = Math.floor(Date.now() / 1000) - 60;
+
+    // 生成用户访问令牌
+    const token = streamVideo.generateUserToken({
+      user_id: ctx.auth.user.id,
+      exp: expirationTime,
+      validity_in_seconds: issuedAt,
+    });
+
+    // 返回生成的令牌
+    return token;
+  }),
   /**
    * getMany 查询过程
    * 该方法用于获取会议列表，支持分页、搜索和多种筛选功能
@@ -175,22 +227,108 @@ export const meetingsRouter = createTRPCRouter({
       return existingMeeting;
     }),
 
-  // 定义一个名为 create 的受保护的 procedure, 用于创建新的会议记录。
+  /**
+   * create 创建会议过程
+   * 该方法用于创建新的会议记录, 并完成视频会议的初始化设置
+   *
+   * 功能说明:
+   * 1. 创建新的会议数据库记录
+   * 2. 初始化视频会议房间
+   * 3. 配置会议的录制和转写设置
+   * 4. 添加AI助手为会议参与者
+   *
+   * 处理流程:
+   * 1. 在数据库中创建会议记录
+   * 2. 使用 Stream Video API 创建视频会议房间:
+   *    - 设置会议元数据(ID和名称)
+   *    - 配置自动录制和转写功能
+   * 3. 验证并获取 AI 助手信息
+   * 4. 将AI助手添加为会议参与者
+   *
+   * 输入参数:
+   * - 通过 meetingsInsertSchema 验证的会议创建数据
+   *
+   * 返回数据:
+   * @returns {Promise<Meeting>} - 返回新创建的会议记录
+   *
+   * 错误处理:
+   * - 如果指定的AI助手不存在, 抛出NOT_FOUND错误
+   */
   create: protectedProcedure
-    // 使用从 ../schemas 导入的 meetingsInsertSchema 来验证客户端传入的输入数据。
-    // input 方法确保只有符合 meetingsInsertSchema 结构的数据才能进入 mutation。
+    // 使用 meetingsInsertSchema 验证输入参数
     .input(meetingsInsertSchema)
-    // .mutation 定义了此 procedure 的核心逻辑, 它会修改数据库。
     .mutation(async ({ input, ctx }) => {
-      // 在 meetings 表中插入一条新的记录。
+      // 在数据库中创建新的会议记录
+      // 将用户ID和输入的会议信息组合后插入数据库
       const [createdMeeting] = await db
         .insert(meetings)
-        // values 指定了要插入的数据。这里我们将客户端提供的 input 数据
-        // 与当前认证用户的 ID 合并, 以确保会议记录与用户关联。
         .values({ ...input, userId: ctx.auth.user.id })
-        // returning 方法指定在插入操作成功后, 返回新创建的完整记录。
         .returning();
-      // 将新创建的会议对象返回给客户端。
+
+      // 初始化视频会议房间
+      // 使用会议 ID 创建默认类型的视频通话实例
+      const call = streamVideo.video.call("default", createdMeeting.id);
+
+      // 创建视频会议并配置相关设置
+      // 包括:
+      // 1. 设置创建者ID
+      // 2. 配置会议元数据(ID和名称)
+      // 3. 设置自动转写(中文)和字幕
+      // 4. 配置自动录制(1080p质量)
+      await call.create({
+        data: {
+          created_by_id: ctx.auth.user.id,
+          custom: {
+            meetingId: createdMeeting.id,
+            meetingName: createdMeeting.name,
+          },
+          settings_override: {
+            transcription: {
+              language: "zh",
+              mode: "auto-on",
+              closed_caption_mode: "auto-on",
+            },
+            recording: {
+              mode: "auto-on",
+              quality: "1080p",
+            },
+          },
+        },
+      });
+
+      // 查询并验证AI助手是否存在
+      // 从数据库中获取指定ID的AI助手信息
+      const [existingAgent] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, createdMeeting.agentId));
+
+      // 如果AI助手不存在, 抛出NOT_FOUND错误
+      if (!existingAgent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "未找到智能体",
+        });
+      }
+
+      // 将AI助手添加为会议参与者
+      // 配置AI助手的用户信息，包括:
+      // 1. 使用助手ID和名称
+      // 2. 设置普通用户角色
+      // 3. 生成机器人风格头像
+      await streamVideo.upsertUsers([
+        {
+          id: existingAgent.id,
+          name: existingAgent.name,
+          role: "user",
+          image: generateAvatarUri({
+            seed: existingAgent.name,
+            variant: "botttsNeutral",
+          }),
+        },
+      ]);
+
+      // 返回创建的会议记录
       return createdMeeting;
     }),
 

@@ -8,7 +8,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 // 定义异步页面组件
-export const Page = async () => {
+const Page = async () => {
   // 获取当前用户会话信息
   const session = await auth.api.getSession({
     headers: await headers(), // 传入请求头信息用于会话验证
