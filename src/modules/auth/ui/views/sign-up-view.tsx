@@ -35,22 +35,36 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useRouter } from "next/navigation";
 
 // 使用 zod 定义表单的校验 schema
 const formSchema = z
   .object({
     // name 字段不能为空
-    name: z.string().min(1, { message: "请输入昵称" }),
+    name: z
+      .string()
+      .min(1, { message: "请输入昵称" })
+      .max(20, { message: "昵称不能超过20个字符" })
+      .regex(/^[a-zA-Z0-9\u4e00-\u9fa5_-]+$/, {
+        message: "昵称只能包含字母、数字、中文、下划线和连字符",
+      }),
     // email 字段必须是有效的邮箱格式
-    email: z.string().email({ message: "请输入正确的邮箱" }),
+    email: z
+      .string()
+      .min(1, { message: "请输入邮箱" })
+      .email({ message: "请输入正确的邮箱格式" })
+      .max(50, { message: "邮箱长度不能超过50个字符" }),
     // password 字段不能为空
-    password: z.string().min(1, { message: "请输入密码" }),
+    password: z
+      .string()
+      .min(8, { message: "密码长度至少为8个字符" })
+      .max(50, { message: "密码长度不能超过50个字符" }),
     // confirmPassword 字段不能为空
     confirmPassword: z.string().min(1, { message: "请再次输入密码" }),
   })
   // 自定义校验规则，确保 password 和 confirmPassword 字段的值匹配
   .refine((data) => data.password === data.confirmPassword, {
-    message: "密码不匹配",
+    message: "两次输入的密码不一致",
     path: ["confirmPassword"], // 指定错误信息关联到 confirmPassword 字段
   });
 
@@ -60,6 +74,8 @@ export const SignUpView = () => {
   const [pending, setPending] = useState(false);
   // 定义 error 状态，用于存储注册过程中发生的错误信息
   const [error, setError] = useState<string | null>(null);
+  // 路由对象
+  const router = useRouter();
 
   // 使用 useForm hook 初始化表单
   const form = useForm<z.infer<typeof formSchema>>({
@@ -95,6 +111,8 @@ export const SignUpView = () => {
         onSuccess: () => {
           // 取消提交中状态
           setPending(false);
+          // 跳转到
+          router.push("/");
         },
         // 注册失败时的回调
         onError: ({ error }) => {

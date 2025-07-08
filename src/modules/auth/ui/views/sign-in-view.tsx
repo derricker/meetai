@@ -35,6 +35,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+// 导入 useRouter
+import { useRouter } from "next/navigation";
 
 // 使用 zod 定义表单的校验 schema
 const formSchema = z.object({
@@ -50,6 +52,8 @@ export const SignInView = () => {
   const [pending, setPending] = useState(false);
   // 定义 error 状态，用于存储登录过程中发生的错误信息
   const [error, setError] = useState<string | null>(null);
+  // 路由对象
+  const router = useRouter();
 
   // 使用 useForm hook 初始化表单
   const form = useForm<z.infer<typeof formSchema>>({
@@ -82,6 +86,8 @@ export const SignInView = () => {
         onSuccess: () => {
           // 取消提交中状态
           setPending(false);
+          // 页面跳转
+          router.push("/");
         },
         // 登录失败时的回调
         onError: ({ error }) => {
