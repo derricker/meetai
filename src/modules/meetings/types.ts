@@ -32,3 +32,17 @@ export enum MeetingStatus {
   // 已取消的会议
   Cancelled = "cancelled",
 }
+
+// 定义一个名为 StreamTranscriptItem 的类型，用于表示流式转录中的单个项目
+export type StreamTranscriptItem = {
+  // 发言人的唯一标识符
+  speaker_id: string;
+  // 转录项目的类型, 例如 word 或 punctuation
+  type: string;
+  // 转录的文本内容。
+  text: string;
+  // 该转录项目开始的时间戳 (秒)
+  start_ts: number;
+  // 该转录项目结束的时间戳 (秒)
+  stop_ts: number;
+};

@@ -12,6 +12,9 @@ import { db } from "@/db"; // 数据库实例
 import { agents, meetings } from "@/db/schema"; // 数据库 schema 中的 agents 和 meetings 表
 import { streamVideo } from "@/lib/stream-video"; // Stream Video SDK 实例
 
+// 导入 Inngest 客户端实例，用于处理异步事件和任务队列
+import { inngest } from "@/inngest/client";
+
 /**
  * 使用 Stream Video SDK 验证 webhook 签名。
  * @param body 请求体原始字符串。
@@ -201,6 +204,19 @@ export async function POST(req: NextRequest) {
       // 返回错误响应, 提示会议未找到, 状态码为 404
       return NextResponse.json({ error: "会议未找到" }, { status: 404 });
     }
+
+    // 发送会议处理事件到 Inngest
+    // 包含会议ID和转录URL的数据
+    await inngest.send({
+      // 事件名称为 meetings/processing
+      name: "meetings/processing",
+      data: {
+        // 传递更新后的会议ID
+        meetingId: updatedMeeting.id,
+        // 传递转录文件的URL
+        transcriptUrl: updatedMeeting.transcriptUrl,
+      },
+    });
   } else if (eventType === "call.recording_ready") {
     // 如果事件类型是 call.recording_ready, 表示通话录音已准备就绪
     // 将 payload 断言为 CallRecordingReadyEvent 类型
