@@ -1,5 +1,14 @@
-import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
+import { config } from "dotenv";
+
+// 根据 NODE_ENV 的值加载不同的 .env 文件
+// 如果是 'production'，加载 .env.production
+// 否则，加载 .env.development
+if (process.env.NODE_ENV === "production") {
+  config({ path: ".env.production" });
+} else {
+  config({ path: ".env.development" });
+}
 
 // 导出 Drizzle ORM 配置
 export default defineConfig({

@@ -31,6 +31,9 @@ import { ActiveState } from "../components/active-state";
 // 导入即将开始的会议状态的展示组件
 import { UpcomingState } from "../components/upcoming-state";
 
+// 导入已完成状态的会议组件，用于显示已结束的会议详情和会议记录
+import { CompletedState } from "../components/completed-state";
+
 // 定义组件的 Props 接口。
 interface Props {
   meetingId: string; // 会议的唯一标识符。
@@ -119,7 +122,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
         />
         {isCancelled && <CancelledState />}
         {isProcessing && <ProcessingState />}
-        {isCompleted && <p>会议已完成</p>}
+        {isCompleted && <CompletedState data={data} />}
         {isActive && <ActiveState meetingId={meetingId} />}
         {isUpcoming && <UpcomingState meetingId={meetingId} />}
       </div>
