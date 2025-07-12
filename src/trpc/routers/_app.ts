@@ -2,6 +2,7 @@
 import { meetingsRouter } from "@/modules/meetings/server/procedures";
 import { createTRPCRouter } from "../init";
 import { agentsRouter } from "@/modules/agents/server/procedures";
+import { premiumRouter } from "@/modules/premium/server/procedures";
 
 // 使用 createTRPCRouter 函数创建一个名为 appRouter 的 tRPC 路由并导出它
 // 这个路由对象是你的 API 的集合, 它将包含你定义的所有端点
@@ -9,6 +10,7 @@ import { agentsRouter } from "@/modules/agents/server/procedures";
 export const appRouter = createTRPCRouter({
   agents: agentsRouter,
   meetings: meetingsRouter,
+  premium: premiumRouter,
 });
 
 // 这是 tRPC 实现端到端类型安全的关键魔法之一

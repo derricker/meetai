@@ -65,6 +65,10 @@ export const AgentIdView = ({ agentId }: Props) => {
         await queryClient.invalidateQueries(
           trpc.agents.getMany.queryOptions({})
         );
+        // 使免费使用额度的查询失效, 触发重新获取最新的使用情况数据
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
         // 删除成功后跳转到智能体列表页面
         router.push("/agents");
       },

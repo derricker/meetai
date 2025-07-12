@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 // 导入 sonner 库的 toast 函数, 用于显示通知消息。
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 /**
  * AgentForm 组件的属性 (props) 类型定义。
@@ -55,6 +56,9 @@ export const AgentForm = ({
   // 获取 React Query 的查询客户端实例, 用于手动管理缓存。
   const queryClient = useQueryClient();
 
+  // 获取路由对象
+  const router = useRouter();
+
   // 使用 useMutation 创建一个用于 "创建 agent" 的 mutation。
   const createAgent = useMutation(
     // 使用 tRPC 提供的 mutationOptions 来配置 useMutation
@@ -65,6 +69,10 @@ export const AgentForm = ({
         await queryClient.invalidateQueries(
           trpc.agents.getMany.queryOptions({})
         );
+        // 使免费使用额度的查询失效, 触发重新获取最新的使用情况数据
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
         // 调用父组件传入的 onSuccess 回调, 例如关闭对话框。
         onSuccess?.();
       },
@@ -72,6 +80,11 @@ export const AgentForm = ({
       onError: (error) => {
         // 使用 toast 显示错误消息
         toast.error(error.message);
+        // 如果错误数据存在且错误码为 "FORBIDDEN"（禁止访问）
+        if (error.data?.code === "FORBIDDEN") {
+          // 重定向用户到 "/upgrade" 页面，通常表示需要升级账户才能继续操作
+          router.push("/upgrade");
+        }
       },
     })
   );

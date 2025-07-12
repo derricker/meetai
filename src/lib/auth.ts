@@ -15,9 +15,40 @@ import { db } from "@/db";
 // schema 包含了所有的数据表定义，包括用户表、会话表等
 import * as schema from "@/db/schema";
 
+// 从 @polar-sh/better-auth 包导入 Polar 相关的认证组件
+// polar: Polar 认证插件的主要组件
+// checkout: 处理支付和结账流程的组件
+// portal: 用户订阅管理门户组件
+import { polar, checkout, portal } from "@polar-sh/better-auth";
+// 导入 Polar 客户端实例
+// 这个实例用于与 Polar 服务进行通信，处理认证、支付等操作
+import { polarClient } from "./polar";
+
 // 初始化并导出认证系统实例
 // 这个实例将被用于处理所有的认证相关操作
 export const auth = betterAuth({
+  // 插件配置, 用于扩展认证系统的功能
+  plugins: [
+    // Polar 认证插件, 用于集成 Polar 平台的认证服务
+    polar({
+      // Polar 客户端实例, 用于与 Polar API 进行通信
+      client: polarClient,
+      // 当用户注册时, 是否在 Polar 平台创建客户
+      createCustomerOnSignUp: true,
+      // 使用的中间件或功能
+      use: [
+        // 结账功能, 用于处理支付和订阅流程
+        checkout({
+          // 只有认证用户才能访问结账页面
+          authenticatedUsersOnly: true,
+          // 结账成功后的重定向 URL
+          successUrl: "/upgrade",
+        }),
+        // 门户功能，用于管理用户订阅或设置
+        portal(),
+      ],
+    }),
+  ],
   // 配置社交登录提供商
   socialProviders: {
     github: {

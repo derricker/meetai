@@ -25,6 +25,9 @@ import {
 // 导入用户按钮组件
 import { DashboardUserButton } from "./dashboard-user-button";
 
+// 导入试用版组件, 用于显示用户试用状态和相关信息
+import { DashboardTrial } from "./dashboard-trial";
+
 // 定义侧边栏第一部分的导航项配置
 const firstSection = [
   {
@@ -134,6 +137,7 @@ export const DashboardSidebar = () => {
       </SidebarContent>
       {/* 侧边栏底部, 包含用户按钮 */}
       <SidebarFooter className="text-white">
+        <DashboardTrial />
         <DashboardUserButton />
       </SidebarFooter>
     </Sidebar>

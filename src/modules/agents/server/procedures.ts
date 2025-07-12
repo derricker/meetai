@@ -3,7 +3,11 @@ import { db } from "@/db";
 // 导入 agents 表的 schema 定义
 import { agents } from "@/db/schema";
 // 导入 tRPC 的基础 procedure 和 router 创建函数
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  createTRPCRouter,
+  premiumProcedure,
+  protectedProcedure,
+} from "@/trpc/init";
 
 // 导入 TRPCError 用于处理 API 错误
 // import { TRPCError } from "@trpc/server";
@@ -125,7 +129,7 @@ export const agentsRouter = createTRPCRouter({
    * @param {object} input - 输入对象，其结构需要符合 agentsInsertSchema 的定义
    * @param {object} ctx - tRPC 的上下文对象，其中包含用户信息 (ctx.auth)
    */
-  create: protectedProcedure
+  create: premiumProcedure("agents")
     // 使用从 schemas.ts 导入的 agentsInsertSchema 来验证输入数据
     .input(agentsInsertSchema)
     .mutation(async ({ input, ctx }) => {

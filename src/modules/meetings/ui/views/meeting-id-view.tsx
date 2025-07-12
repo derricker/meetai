@@ -71,6 +71,10 @@ export const MeetingIdView = ({ meetingId }: Props) => {
         await queryClient.invalidateQueries(
           trpc.meetings.getMany.queryOptions({})
         );
+        // 使免费使用额度的查询失效, 触发重新获取最新的使用情况数据
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
         // 重定向到会议列表页面。
         router.push("/meetings");
       },

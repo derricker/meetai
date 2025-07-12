@@ -10,7 +10,11 @@ import { db } from "@/db";
 // 导入数据库 schema 中的 meetings 表定义
 import { agents, meetings, user } from "@/db/schema";
 // 导入 tRPC 的路由创建函数和受保护的过程，用于定义 API 端点
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  createTRPCRouter,
+  premiumProcedure,
+  protectedProcedure,
+} from "@/trpc/init";
 // 导入 tRPC 的错误类，用于抛出标准化的 API 错误
 import { TRPCError } from "@trpc/server";
 // 导入 Drizzle ORM 的查询操作符，用于构建 SQL 查询
@@ -435,7 +439,7 @@ export const meetingsRouter = createTRPCRouter({
    * 错误处理:
    * - 如果指定的AI助手不存在, 抛出NOT_FOUND错误
    */
-  create: protectedProcedure
+  create: premiumProcedure("meetings")
     // 使用 meetingsInsertSchema 验证输入参数
     .input(meetingsInsertSchema)
     .mutation(async ({ input, ctx }) => {

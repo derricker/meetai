@@ -14,6 +14,22 @@ import { headers } from "next/headers";
 // 这有助于避免重复的数据获取或计算, 提升性能
 import { cache } from "react";
 
+// 导入数据库实例
+import { db } from "@/db";
+// 导入数据库表结构定义
+import { agents, meetings } from "@/db/schema";
+// 导入 Polar 客户端，用于处理订阅和付费相关功能
+import { polarClient } from "@/lib/polar";
+// 导入免费版本的使用限制常量
+import {
+  MAX_FREE_AGENTS,
+  MAX_FREE_MEETINGS,
+} from "@/modules/premium/constants";
+// 导入 Drizzle ORM 的工具函数
+// count: 用于计数查询
+// eq: 用于构建相等条件的查询
+import { count, eq } from "drizzle-orm";
+
 // 定义并导出一个名为 createTRPCContext 的异步函数, 用于创建 tRPC 的上下文对象
 // 它包含了所有 tRPC 路由和程序都可以访问的数据
 // 这通常是存放数据库连接、用户身份验证信息等共享资源的地方
@@ -67,3 +83,74 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   // 这样, 后续的路由处理程序就可以通过 ctx.auth 访问到当前用户的会话信息
   return next({ ctx: { ...ctx, auth: session } });
 });
+
+// 导出一个名为 premiumProcedure 的函数, 它接受一个实体类型 ("meetings" 或 "agents") 作为参数
+// 这个函数用于创建一个受保护的 tRPC 过程, 增加了对免费用户使用限制的检查
+export const premiumProcedure = (entity: "meetings" | "agents") =>
+  // 使用 protectedProcedure.use 来创建一个中间件
+  protectedProcedure.use(async ({ ctx, next }) => {
+    // 通过 polarClient 获取外部客户状态, 这里的外部 ID 是当前用户的 ID
+    const customer = await polarClient.customers.getStateExternal({
+      externalId: ctx.auth.user.id,
+    });
+
+    // 查询当前用户创建的会议数量
+    const [userMeetings] = await db
+      .select({
+        // 统计 meetings 表中的记录数
+        count: count(meetings.id),
+      })
+      .from(meetings)
+      // 条件是 userId 匹配当前用户
+      .where(eq(meetings.userId, ctx.auth.user.id));
+
+    // 查询当前用户创建的智能体数量
+    const [userAgents] = await db
+      .select({
+        // 统计 agents 表中的记录数
+        count: count(agents.id),
+      })
+      .from(agents)
+      // 条件是 userId 匹配当前用户
+      .where(eq(agents.userId, ctx.auth.user.id));
+
+    // 检查用户是否为付费用户 (是否有有效的订阅)
+    const isPremium = customer.activeSubscriptions.length > 0;
+    // 检查免费用户的智能体数量是否已达到上限
+    const isFreeAgentLimitReached = userAgents.count >= MAX_FREE_AGENTS;
+    // 检查免费用户的会议数量是否已达到上限
+    const isFreeMeetingLimitReached = userMeetings.count >= MAX_FREE_MEETINGS;
+
+    // 判断是否应该抛出会议相关的错误
+    // 条件: 实体是 "meetings", 会议数量达到上限, 且用户不是付费用户
+    const shouldThrowMeetingError =
+      entity === "meetings" && isFreeMeetingLimitReached && !isPremium;
+    // 判断是否应该抛出代理相关的错误
+    // 条件: 实体是 "agents", 代理数量达到上限, 且用户不是付费用户
+    const shouldThrowAgentError =
+      entity === "agents" && isFreeAgentLimitReached && !isPremium;
+
+    // 如果应该抛出会议错误, 则抛出一个 TRPCError
+    if (shouldThrowMeetingError) {
+      throw new TRPCError({
+        // 错误码为 FORBIDDEN
+        code: "FORBIDDEN",
+        // 错误信息
+        message: "您已达到免费会议的最大数量限制",
+      });
+    }
+
+    // 如果应该抛出代理错误, 则抛出一个 TRPCError
+    if (shouldThrowAgentError) {
+      throw new TRPCError({
+        // 错误码为 FORBIDDEN
+        code: "FORBIDDEN",
+        // 错误信息
+        message: "您已达到免费智能体的最大数量限制",
+      });
+    }
+
+    // 如果没有达到限制，则继续执行下一个中间件或过程
+    // 并将 customer 信息添加到上下文中
+    return next({ ctx: { ...ctx, customer } });
+  });

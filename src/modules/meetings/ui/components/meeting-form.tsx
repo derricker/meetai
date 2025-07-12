@@ -87,6 +87,10 @@ export const MeetingForm = ({
         await queryClient.invalidateQueries(
           trpc.meetings.getMany.queryOptions({})
         );
+        // 使免费使用额度的查询失效, 触发重新获取最新的使用情况数据
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
+        );
         onSuccess?.(data.id); // 调用成功回调，并传递新会议的 id
       },
       onError: (error) => {
