@@ -6,6 +6,7 @@ import {
   CallRecordingReadyEvent, // 通话录音就绪事件
   CallSessionParticipantLeftEvent, // 通话参与者离开事件
   CallSessionStartedEvent, // 通话会话开始事件
+  MessageNewEvent, // 新的消息事件
 } from "@stream-io/node-sdk";
 
 import { db } from "@/db"; // 数据库实例
@@ -14,6 +15,18 @@ import { streamVideo } from "@/lib/stream-video"; // Stream Video SDK 实例
 
 // 导入 Inngest 客户端实例，用于处理异步事件和任务队列
 import { inngest } from "@/inngest/client";
+
+// 从 @/lib/stream-chat 导入 Stream Chat 客户端实例
+import { streamChat } from "@/lib/stream-chat";
+// 从 openai 库导入聊天完成消息参数的类型定义
+import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+// 导入 OpenAI 库
+import OpenAI from "openai";
+// 从 @/lib/avatar 导入头像 URI 生成函数
+import { generateAvatarUri } from "@/lib/avatar";
+
+// 使用环境变量中的 API 密钥初始化 OpenAI 客户端
+const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 /**
  * 使用 Stream Video SDK 验证 webhook 签名。
@@ -234,6 +247,124 @@ export async function POST(req: NextRequest) {
       })
       // 根据会议 ID 进行更新
       .where(eq(meetings.id, meetingId));
+  } else if (eventType === "message.new") {
+    // 如果事件类型是 message.new, 表示新消息事件
+    // 将收到的 Webhook 负载断言为 MessageNewEvent 类型
+    const event = payload as MessageNewEvent;
+
+    // 从事件中提取用户 ID、频道 ID 和消息文本
+    const userId = event.user?.id;
+    const channelId = event.channel_id;
+    const text = event.message?.text;
+
+    // 检查必要字段是否存在，如果缺少则返回 400 错误
+    if (!userId || !channelId || !text) {
+      return NextResponse.json({ error: "缺少必要字段" }, { status: 400 });
+    }
+
+    // 在数据库中查询已完成的会议
+    const [existingMeeting] = await db
+      .select()
+      .from(meetings)
+      .where(and(eq(meetings.id, channelId), eq(meetings.status, "completed")));
+
+    // 如果找不到对应的会议，则返回 404 错误
+    if (!existingMeeting) {
+      return NextResponse.json({ error: "会议未找到" }, { status: 404 });
+    }
+
+    // 在数据库中查询与会议关联的智能体（Agent）
+    const [existingAgent] = await db
+      .select()
+      .from(agents)
+      .where(eq(agents.id, existingMeeting.agentId));
+
+    // 如果找不到对应的智能体，则返回 404 错误
+    if (!existingAgent) {
+      return NextResponse.json({ error: "智能体未找到" }, { status: 404 });
+    }
+
+    // 检查消息是否由智能体自身发送，如果不是，则继续处理
+    if (userId !== existingAgent.id) {
+      // 构建给 GPT-4o 的指令（instructions）
+      const instructions = `
+      您是一个 AI 助手，正在帮助用户回顾一个最近完成的会议。
+      以下是根据会议记录生成的会议摘要：
+      
+      ${existingMeeting.summary}
+      
+      以下是您在实时会议助手期间的原始指令。在协助用户时，请继续遵循这些行为准则：
+      
+      ${existingAgent.instructions}
+      
+      用户可能会询问有关会议的问题、请求澄清或要求采取后续行动。
+      请始终基于上述会议摘要进行回应。
+      
+      您还可以访问您与用户之间的最近对话历史记录。请使用先前消息的上下文来提供相关、连贯和有用的回应。如果用户的问题涉及到之前讨论过的内容，请务必考虑到这一点并保持对话的连续性。
+      
+      如果摘要中没有足够的信息来回答问题，请礼貌地告知用户。
+      
+      请做到简洁、有帮助，并专注于根据会议和正在进行的对话提供准确的信息。
+      `;
+
+      // 初始化 Stream Chat 客户端并指定频道
+      const channel = streamChat.channel("messaging", channelId);
+      // 监听频道以获取最新状态
+      await channel.watch();
+
+      // 获取并格式化最近 5 条非空消息作为对话历史
+      const previousMessages = channel.state.messages
+        .slice(-5)
+        .filter((msg) => msg.text && msg.text.trim() !== "")
+        .map<ChatCompletionMessageParam>((message) => ({
+          role: message.user?.id === existingAgent.id ? "assistant" : "user",
+          content: message.text || "",
+        }));
+
+      // 调用 OpenAI API 获取 GPT 的响应
+      const GPTResponse = await openaiClient.chat.completions.create({
+        messages: [
+          { role: "system", content: instructions }, // 系统指令
+          ...previousMessages, // 对话历史
+          { role: "user", content: text }, // 用户的新消息
+        ],
+        model: "gpt-4o", // 使用的模型
+      });
+
+      // 提取 GPT 的响应文本
+      const GPTResponseText = GPTResponse.choices[0].message.content;
+
+      // 如果 GPT 未返回任何内容，则返回 400 错误
+      if (!GPTResponseText) {
+        return NextResponse.json(
+          { error: "No response from GPT" },
+          { status: 400 }
+        );
+      }
+
+      // 为智能体生成一个头像 URI
+      const avatarUrl = generateAvatarUri({
+        seed: existingAgent.name,
+        variant: "botttsNeutral",
+      });
+
+      // 在 Stream Chat 中创建或更新智能体的用户信息
+      streamChat.upsertUser({
+        id: existingAgent.id,
+        name: existingAgent.name,
+        image: avatarUrl,
+      });
+
+      // 将 GPT 生成的响应作为智能体的消息发送到频道
+      channel.sendMessage({
+        text: GPTResponseText,
+        user: {
+          id: existingAgent.id,
+          name: existingAgent.name,
+          image: avatarUrl,
+        },
+      });
+    }
   }
   // 返回成功响应
   return NextResponse.json({ status: "ok" });

@@ -27,6 +27,10 @@ import { Badge } from "@/components/ui/badge";
 // 导入格式化时长的工具函数
 import { formatDuration } from "@/lib/utils";
 
+// 导入 Transcript 组件, 用于显示会议转录内容的详细视图
+import { Transcript } from "./transcript";
+import { ChatProvider } from "./chat-provider";
+
 // 定义组件的属性接口
 interface Props {
   // data 属性, 包含一个会议的详细信息
@@ -80,9 +84,13 @@ export const CompletedState = ({ data }: Props) => {
           </ScrollArea>
         </div>
         {/* "互动问答" 选项卡内容区域 */}
-        <TabsContent value="chat"></TabsContent>
+        <TabsContent value="chat">
+          <ChatProvider meetingId={data.id} meetingName={data.name} />
+        </TabsContent>
         {/* "会议转录" 选项卡内容区域 */}
-        <TabsContent value="transcript"></TabsContent>
+        <TabsContent value="transcript">
+          <Transcript meetingId={data.id} />
+        </TabsContent>
         {/* "会议记录" 选项卡内容区域 */}
         <TabsContent value="recording">
           <div className="bg-white rounded-lg border px-4 py-5">

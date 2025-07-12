@@ -8,28 +8,209 @@ import {
 // 导入数据库实例，用于执行数据库操作
 import { db } from "@/db";
 // 导入数据库 schema 中的 meetings 表定义
-import { agents, meetings } from "@/db/schema";
+import { agents, meetings, user } from "@/db/schema";
 // 导入 tRPC 的路由创建函数和受保护的过程，用于定义 API 端点
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 // 导入 tRPC 的错误类，用于抛出标准化的 API 错误
 import { TRPCError } from "@trpc/server";
 // 导入 Drizzle ORM 的查询操作符，用于构建 SQL 查询
-import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  ilike,
+  inArray,
+  sql,
+} from "drizzle-orm";
 // 导入 Zod，一个用于数据验证的库
 import { z } from "zod";
 
 // 从 meetings 模块的 schemas 文件中导入 Zod 验证 schema，用于校验创建和更新会议时的输入数据。
 import { meetingsInsertSchema, meetingsUpdateSchema } from "../schemas";
 // 导入会议状态枚举
-import { MeetingStatus } from "../types";
+import { MeetingStatus, StreamTranscriptItem } from "../types";
 
 // 导入 streamVideo 工具函数, 该函数提供了视频流相关的核心功能: 创建和管理视频会议、处理实时视频流、管理会议参与者等
 import { streamVideo } from "@/lib/stream-video";
 // 导入 generateAvatarUri 工具函数, 该函数用于: 为用户和AI助手生成头像、支持多种头像样式(initials、bottts等)等
 import { generateAvatarUri } from "@/lib/avatar";
+// 导入 JSONL 解析库，用于处理 JSON Lines 格式的数据
+// 主要用途：
+// 1. 解析会议转写文本, 每行包含一个 JSON 对象
+// 2. 支持流式处理大型转写文件
+// 3. 提供 parse 和 stringify 方法进行 JSONL 格式转换
+import JSONL from "jsonl-parse-stringify";
+
+// 导入 streamChat 工具函数, 该函数提供了聊天功能相关的核心功能:
+// 1. 创建和管理聊天频道
+// 2. 处理实时消息
+// 3. 管理用户权限和身份验证
+// 4. 生成聊天令牌
+import { streamChat } from "@/lib/stream-chat";
 
 // 使用 createTRPCRouter 创建一个名为 meetingsRouter 的 tRPC 路由
 export const meetingsRouter = createTRPCRouter({
+  /**
+   * generateChatToken 聊天令牌生成过程
+   * 该方法用于生成聊天功能所需的用户访问令牌
+   *
+   * 功能说明:
+   * 1. 为当前用户生成聊天令牌
+   * 2. 在聊天服务中创建或更新用户信息
+   *
+   * 处理流程:
+   * 1. 使用用户ID生成聊天令牌
+   * 2. 通过 upsertUser 在聊天服务中更新用户信息:
+   *    - 设置用户ID
+   *    - 分配管理员角色
+   *
+   * 返回数据:
+   * @returns {Promise<string>} - 返回生成的聊天令牌
+   */
+  generateChatToken: protectedProcedure.mutation(async ({ ctx }) => {
+    const token = streamChat.createToken(ctx.auth.user.id);
+    await streamChat.upsertUser({
+      id: ctx.auth.user.id,
+      role: "admin",
+    });
+
+    return token;
+  }),
+  /**
+   * getTranscript 获取会议转写记录过程
+   * 该方法用于获取指定会议的转写文本及发言者信息
+   *
+   * 功能说明:
+   * 1. 获取并验证会议记录
+   * 2. 获取会议转写文本
+   * 3. 关联发言者信息(包括用户和AI助手)
+   * 4. 为每条转写记录添加发言者详情
+   *
+   * 输入参数:
+   * @param {string} id - 会议ID
+   *
+   * 返回数据:
+   * @returns {Promise<Array<TranscriptItem & {user: {name: string, image: string}}>>}
+   * 返回带有发言者信息的转写记录数组
+   *
+   * 错误处理:
+   * - 如果会议不存在或不属于当前用户, 抛出 NOT_FOUND 错误
+   * - 如果转写URL不存在, 返回空数组
+   * - 如果转写内容获取失败, 返回空数组
+   */
+  getTranscript: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
+      // 查询并验证会议记录
+      // 确保只能访问属于当前用户的会议
+      const [existingMeeting] = await db
+        .select()
+        .from(meetings)
+        .where(
+          and(eq(meetings.id, input.id), eq(meetings.userId, ctx.auth.user.id))
+        );
+
+      // 如果会议不存在, 抛出错误
+      if (!existingMeeting) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "会议未找到",
+        });
+      }
+
+      // 如果会议没有转写URL, 返回空数组
+      if (!existingMeeting.transcriptUrl) {
+        return [];
+      }
+
+      // 获取转写内容
+      // 1. 从转写 URL 获取文本内容
+      // 2. 解析 JSONL 格式的转写记录
+      // 3. 如果获取失败则返回空数组
+      const transcript = await fetch(existingMeeting.transcriptUrl)
+        .then((res) => res.text())
+        .then((text) => JSONL.parse<StreamTranscriptItem>(text))
+        .catch(() => {
+          return [];
+        });
+
+      // 提取所有发言者ID
+      // 使用 Set 去重后转换回数组
+      const speakerIds = [
+        ...new Set(transcript.map((item) => item.speaker_id)),
+      ];
+
+      // 获取用户发言者信息
+      // 1. 查询所有用户发言者的基本信息
+      // 2. 为没有头像的用户生成默认头像
+      const userSpeakers = await db
+        .select()
+        .from(user)
+        .where(inArray(user.id, speakerIds))
+        .then((users) =>
+          users.map((user) => ({
+            ...user,
+            image:
+              user.image ??
+              generateAvatarUri({ seed: user.name, variant: "initials" }),
+          }))
+        );
+
+      // 获取AI助手发言者信息
+      // 1. 查询所有AI助手发言者的基本信息
+      // 2. 为AI助手生成机器人风格头像
+      const agentSpeakers = await db
+        .select()
+        .from(agents)
+        .where(inArray(agents.id, speakerIds))
+        .then((agents) =>
+          agents.map((agent) => ({
+            ...agent,
+            image: generateAvatarUri({
+              seed: agent.name,
+              variant: "botttsNeutral",
+            }),
+          }))
+        );
+
+      // 合并所有发言者信息
+      const speakers = [...userSpeakers, ...agentSpeakers];
+
+      // 为每条转写记录添加发言者信息
+      // 1. 根据speaker_id匹配发言者
+      // 2. 如果找不到发言者, 使用 "Unknown" 作为默认值
+      const transcriptWithSpeakers = transcript.map((item) => {
+        const speaker = speakers.find(
+          (speaker) => speaker.id === item.speaker_id
+        );
+
+        if (!speaker) {
+          return {
+            ...item,
+            user: {
+              name: "Unknown",
+              image: generateAvatarUri({
+                seed: "Unknown",
+                variant: "initials",
+              }),
+            },
+          };
+        }
+
+        return {
+          ...item,
+          user: {
+            name: speaker.name,
+            image: speaker.image,
+          },
+        };
+      });
+
+      // 返回带有发言者信息的转写记录
+      return transcriptWithSpeakers;
+    }),
   /**
    * generateToken 令牌生成过程
    * 该方法用于生成视频会议所需的用户访问令牌
