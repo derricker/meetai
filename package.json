@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:push": "drizzle-kit push --config ./drizzle.config.ts",
-    "db:studio": "drizzle-kit studio --config ./drizzle.config.ts"
+    "db:push:prod": "NODE_ENV=production drizzle-kit push --config ./drizzle.config.ts",
+    "db:push:dev": "NODE_ENV=development drizzle-kit push --config ./drizzle.config.ts",
+    "db:studio:prod": "NODE_ENV=production drizzle-kit studio --config ./drizzle.config.ts",
+    "db:studio:dev": "NODE_ENV=development drizzle-kit studio --config ./drizzle.config.ts"
   },
   "dependencies": {
     "@dicebear/collection": "^9.2.3",

@@ -27,6 +27,7 @@ import { polarClient } from "./polar";
 // 初始化并导出认证系统实例
 // 这个实例将被用于处理所有的认证相关操作
 export const auth = betterAuth({
+  trustedOrigins: ["https://123.56.22.147"],
   // 插件配置, 用于扩展认证系统的功能
   plugins: [
     // Polar 认证插件, 用于集成 Polar 平台的认证服务
