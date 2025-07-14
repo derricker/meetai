@@ -53,4 +53,39 @@ export const premiumRouter = createTRPCRouter({
       agentCount: userAgents.count,
     };
   }),
+  // 获取当前用户的订阅信息的查询过程
+  getCurrentSubscription: protectedProcedure.query(async ({ ctx }) => {
+    // 通过 Polar 客户端根据外部 ID（用户 ID）获取客户状态
+    const customer = await polarClient.customers.getStateExternal({
+      externalId: ctx.auth.user.id,
+    });
+
+    // 获取客户的第一个有效订阅（通常用户只有一个订阅）
+    const subscription = customer.activeSubscriptions[0];
+
+    // 如果没有有效订阅，返回 null
+    if (!subscription) {
+      return null;
+    }
+
+    // 根据订阅中的产品 ID 获取产品详细信息
+    const product = await polarClient.products.get({
+      id: subscription.productId,
+    });
+
+    // 返回产品信息
+    return product;
+  }),
+  // 获取所有可用产品列表的查询过程
+  getProducts: protectedProcedure.query(async () => {
+    // 从 Polar 获取产品列表，设置筛选条件
+    const products = await polarClient.products.list({
+      isArchived: false, // 只获取未归档的产品
+      isRecurring: true, // 只获取订阅制（循环付费）产品
+      sorting: ["price_amount"], // 按价格金额排序
+    });
+
+    // 返回产品列表中的具体项目
+    return products.result.items;
+  }),
 });
