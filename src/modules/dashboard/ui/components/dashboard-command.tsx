@@ -13,6 +13,13 @@ import {
 // 导入头像生成组件
 import { GeneratedAvatar } from "@/components/generated-avatar";
 
+// 导入tRPC客户端钩子，用于进行类型安全的API调用
+import { useTRPC } from "@/trpc/client";
+// 导入Next.js路由钩子，用于页面导航
+import { useRouter } from "next/navigation";
+// 导入React Query的useQuery钩子，用于数据获取和缓存管理
+import { useQuery } from "@tanstack/react-query";
+
 // 定义组件属性接口
 interface Props {
   // 控制命令面板的显示状态
@@ -25,9 +32,40 @@ interface Props {
 export const DashboardCommand = ({ open, setOpen }: Props) => {
   // 管理搜索输入的状态
   const [search, setSearch] = useState("");
+
+  // 初始化Next.js路由器实例，用于页面导航
+  const router = useRouter();
+
+  // 初始化tRPC客户端实例，用于类型安全的API调用
+  const trpc = useTRPC();
+
+  // 获取会议列表数据
+  // 使用React Query的useQuery钩子发起请求
+  // 根据搜索关键词筛选，每页显示100条数据
+  const meetings = useQuery(
+    trpc.meetings.getMany.queryOptions({
+      search,
+      pageSize: 100,
+    })
+  );
+
+  // 获取智能体列表数据
+  // 使用React Query的useQuery钩子发起请求
+  // 根据搜索关键词筛选，每页显示100条数据
+  const agents = useQuery(
+    trpc.agents.getMany.queryOptions({
+      search,
+      pageSize: 100,
+    })
+  );
+
   return (
     // 命令对话框，根据open状态显示或隐藏
-    <CommandResponsiveDialog open={open} onOpenChange={setOpen}>
+    <CommandResponsiveDialog
+      shouldFilter={false}
+      open={open}
+      onOpenChange={setOpen}
+    >
       {/* 搜索输入框 */}
       <CommandInput
         placeholder="查找会议或者智能体" // 占位文本
@@ -45,7 +83,17 @@ export const DashboardCommand = ({ open, setOpen }: Props) => {
             </span>
           </CommandEmpty>
           {/* 会议项示例 */}
-          <CommandItem>会议名称</CommandItem>
+          {meetings.data?.items.map((meeting) => (
+            <CommandItem
+              onSelect={() => {
+                router.push(`/meetings/${meeting.id}`);
+                setOpen(false);
+              }}
+              key={meeting.id}
+            >
+              {meeting.name}
+            </CommandItem>
+          ))}
         </CommandGroup>
         {/* 智能体相关命令分组 */}
         <CommandGroup heading="Agents">
@@ -56,14 +104,22 @@ export const DashboardCommand = ({ open, setOpen }: Props) => {
             </span>
           </CommandEmpty>
           {/* 智能体项示例 */}
-          <CommandItem>
-            <GeneratedAvatar
-              seed="智能体名称" // 用于生成头像的种子字符串
-              variant="botttsNeutral" // 头像样式
-              className="size-5" // 头像大小
-            />
-            智能体名称
-          </CommandItem>
+          {agents.data?.items.map((agent) => (
+            <CommandItem
+              onSelect={() => {
+                router.push(`/agents/${agent.id}`);
+                setOpen(false);
+              }}
+              key={agent.id}
+            >
+              <GeneratedAvatar
+                seed={agent.name}
+                variant="botttsNeutral"
+                className="size-5"
+              />
+              {agent.name}
+            </CommandItem>
+          ))}
         </CommandGroup>
       </CommandList>
     </CommandResponsiveDialog>

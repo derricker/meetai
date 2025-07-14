@@ -142,11 +142,11 @@ export const AgentIdView = ({ agentId }: Props) => {
               variant="outline"
               className="flex items-center gap-x-2 [&>svg]:size-4"
             >
-              <VideoIcon className="text-blue-700" />5 会议
+              <VideoIcon className="text-blue-700" /> {data.meetingCount} 会议
             </Badge>
             {/* 显示智能体的指令部分 */}
             <div className="flex flex-col gap-y-4">
-              <p className="text-lg font-medium">Instructions</p>
+              <p className="text-lg font-medium">指令</p>
               <p className="text-neutral-800">{data.instructions}</p>
             </div>
           </div>

@@ -1,7 +1,7 @@
 // 导入数据库实例, 用于数据库操作
 import { db } from "@/db";
 // 导入 agents 表的 schema 定义
-import { agents } from "@/db/schema";
+import { agents, meetings } from "@/db/schema";
 // 导入 tRPC 的基础 procedure 和 router 创建函数
 import {
   createTRPCRouter,
@@ -17,7 +17,7 @@ import { agentsInsertSchema, agentsUpdateSchema } from "../schemas";
 // 导入 Zod 库, 用于定义和验证数据结构。
 import { z } from "zod";
 // eq 函数用于在数据库查询中构建等于条件
-import { and, count, desc, eq, ilike } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike } from "drizzle-orm";
 
 import {
   DEFAULT_PAGE,
@@ -69,7 +69,10 @@ export const agentsRouter = createTRPCRouter({
 
       // 查询分页数据
       const data = await db
-        .select()
+        .select({
+          ...getTableColumns(agents),
+          meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
+        })
         .from(agents)
         .where(whereCondition)
         // 按创建时间和ID降序排序
@@ -106,7 +109,10 @@ export const agentsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // 根据传入的 id 在 agents 表中查询匹配的记录
       const [existingAgent] = await db
-        .select()
+        .select({
+          ...getTableColumns(agents),
+          meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
+        })
         .from(agents)
         // eq 函数用于创建 `agents.id = input.id` 的查询条件
         .where(

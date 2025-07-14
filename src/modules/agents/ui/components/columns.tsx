@@ -54,7 +54,7 @@ export const columns: ColumnDef<AgentGetOne>[] = [
     // 列标题显示文本
     header: "会议",
     // 自定义单元格渲染函数
-    cell: () => (
+    cell: ({ row }) => (
       // 徽章组件: 显示会议相关信息
       <Badge
         // 徽章样式: 轮廓样式
@@ -64,7 +64,7 @@ export const columns: ColumnDef<AgentGetOne>[] = [
       >
         {/* 视频会议图标：蓝色 */}
         <VideoIcon className="text-blue-700" />
-        {/* 会议数量文本：目前硬编码为5 */}5 会议
+        {row.original.meetingCount} 会议
       </Badge>
     ),
   },
