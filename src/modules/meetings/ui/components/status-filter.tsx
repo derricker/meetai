@@ -83,7 +83,7 @@ export const StatusFilter = () => {
     // CommandSelect 组件，用于选择会议状态。
     <CommandSelect
       // 选择框的占位符文本。
-      placeholder="Status"
+      placeholder="会议状态"
       // 选择框的样式，设置高度。
       className="h-9"
       // 传递预定义的选项数组。

@@ -6,7 +6,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 // 导入需要使用的图标组件
-import { BotIcon, StarIcon, VideoIcon } from "lucide-react";
+import {
+  BotIcon,
+  HelpCircleIcon,
+  HistoryIcon,
+  PuzzleIcon,
+  SettingsIcon,
+  StarIcon,
+  UsersIcon,
+  VideoIcon,
+} from "lucide-react";
 // 导入工具函数和UI组件
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -32,22 +41,47 @@ import { DashboardTrial } from "./dashboard-trial";
 const firstSection = [
   {
     icon: VideoIcon,
-    label: "会议",
+    label: "智能会议",
     href: "/meetings",
   },
   {
     icon: BotIcon,
-    label: "智能体",
+    label: "智能助手",
     href: "/agents",
+  },
+  {
+    icon: StarIcon,
+    label: "会员升级",
+    href: "/upgrade",
   },
 ];
 
 // 定义侧边栏第二部分的导航项配置
 const secondSection = [
   {
-    icon: StarIcon,
-    label: "升级",
-    href: "/upgrade",
+    icon: SettingsIcon,
+    label: "系统设置",
+    href: "/settings",
+  },
+  {
+    icon: PuzzleIcon,
+    label: "应用集成",
+    href: "/integrations",
+  },
+  {
+    icon: UsersIcon,
+    label: "团队管理",
+    href: "/team",
+  },
+  {
+    icon: HistoryIcon,
+    label: "历史记录",
+    href: "/history",
+  },
+  {
+    icon: HelpCircleIcon,
+    label: "帮助中心",
+    href: "/help",
   },
 ];
 
