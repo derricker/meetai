@@ -11,6 +11,13 @@ import { StreamClient } from "@stream-io/node-sdk";
 // NEXT_PUBLIC_STREAM_VIDEO_API_KEY 是公开的 API 密钥, 通常用于客户端初始化。
 // STREAM_VIDEO_SECRET_KEY 是秘密密钥, 必须严格保密, 仅在服务器端使用, 用于认证和授权。
 // 感叹号 (!) 表示我们确定这些环境变量在运行时是存在的, 否则 TypeScript 会报错。
+
+console.log(
+  "NEXT_PUBLIC_STREAM_VIDEO_API_KEY",
+  process.env.NEXT_PUBLIC_STREAM_VIDEO_API_KEY
+);
+console.log("STREAM_VIDEO_SECRET_KEY", process.env.STREAM_VIDEO_SECRET_KEY);
+
 export const streamVideo = new StreamClient(
   process.env.NEXT_PUBLIC_STREAM_VIDEO_API_KEY!,
   process.env.STREAM_VIDEO_SECRET_KEY!
